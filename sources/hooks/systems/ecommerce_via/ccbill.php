@@ -109,9 +109,9 @@ class Hook_ccbill
 
 		$account_num = $this->_get_account_id();
 		$subaccount_nums = explode(',', get_option('vpn_username'));
-		$subaccount_num = strval(intval($subaccount_nums[0])); // First value is for simple transactions
+		$subaccount_num = sprintf('%04d', $subaccount_nums[0]); // First value is for simple transactions, has to be exactly 4 digits
 		$form_name = explode(',', get_option('ccbill_form_names'));
-		$form_name = strval(intval($form_name[0])); // First value is for simple transactions
+		$form_name = $form_name[0]; // First value is for simple transactions
 		// CCBill oddly requires us to pass this parameter for single transactions,
 		// this will show up as a confusing "$X.XX for 99 days" message to customers on the CCBill form.
 		// To fix this - you need to set up a "custom dynamic description" which removes that message, by contacting CCBill support.
@@ -176,9 +176,9 @@ class Hook_ccbill
 
 		$account_num = $this->_get_account_id();
 		$subaccount_nums = explode(',', get_option('vpn_username'));
-		$subaccount_num = strval(intval(count($subaccount_nums) === 1 ? $subaccount_nums[0] : $subaccount_nums[1])); // Second value is for subscriptions
+		$subaccount_num = sprintf('%04d', count($subaccount_nums) === 1 ? $subaccount_nums[0] : $subaccount_nums[1]); // Second value is for subscriptions, has to be exactly 4 digits
 		$form_name = explode(',', get_option('ccbill_form_names'));
-		$form_name = strval(intval(count($form_name) === 1 ? $form_name[0] : $form_name[1])); // Second value is for subscriptions
+		$form_name = count($form_name) === 1 ? $form_name[0] : $form_name[1]; // Second value is for subscriptions
 		$form_period = strval($length * $this->_length_unit_to_days[$length_units]);
 		$digest = md5($amount.$form_period.$amount.$form_period.'99'.$currency.get_option('ipn_digest')); // formPrice.formPeriod.formRecurringPrice.formRecurringPeriod.formRebills.currencyCode.salt
 
