@@ -36,7 +36,7 @@ class Module_purchase
 		$info['organisation']='ocProducts';
 		$info['hacked_by']=NULL;
 		$info['hack_version']=NULL;
-		$info['version']=4;
+		$info['version']=5;
 		$info['locked']=false;
 		$info['update_require_upgrade']=1;
 		return $info;
@@ -63,6 +63,7 @@ class Module_purchase
 		delete_config_option('pd_email');
 		delete_config_option('pd_number');
 		delete_config_option('callback_password');
+		delete_config_option('ccbill_form_names');
 		delete_specific_permission('access_ecommerce_in_test_mode');
 
 		delete_menu_item_simple('_SELF:purchase:type=misc');
@@ -137,6 +138,10 @@ class Module_purchase
 			add_config_option('ECOMMERCE_TEST_MODE','ecommerce_test_mode','tick','return \'0\';','ECOMMERCE','ECOMMERCE');
 			add_config_option('IPN_ADDRESS_TEST','ipn_test','line','return get_option(\'staff_address\');','ECOMMERCE','ECOMMERCE');
 			add_config_option('IPN_ADDRESS','ipn','line','return get_option(\'staff_address\');','ECOMMERCE','ECOMMERCE');
+		}
+
+		if (is_null($upgrade_from) || ($upgrade_from<5)) {
+			add_config_option('CCBILL_FORM_NAMES','ccbill_form_names','line','return \'\';','ECOMMERCE','ECOMMERCE');
 		}
 
 		if (is_null($upgrade_from))
