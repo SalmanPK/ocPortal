@@ -245,18 +245,18 @@ class Hook_ccbill
 	function handle_transaction()
 	{
 		// assign posted variables to local variables
-		$trans_id=post_param_integer('customTransId');
+		$trans_id=post_param('customTransId');
 		$purchase_id = post_param_integer('customPurchaseId');
 
 		$transaction_rows=$GLOBALS['SITE_DB']->query_select('trans_expecting',array('*'),array('id'=>$trans_id,'e_purchase_id'=>$purchase_id),'',1);
 		if (!array_key_exists(0,$transaction_rows)) warn_exit(do_lang_tempcode('MISSING_RESOURCE'));
 		$transaction_row=$transaction_rows[0];
 
-		$subscription_id = post_param_integer('subscriptionId', 0);
-		$denial_id = post_param_integer('denialId', 0);
+		$subscription_id = post_param('subscription_id', '');
+		$denial_id = post_param('denialId', '');
 		$response_digest = post_param('responseDigest');
-		$success_response_digest = md5(strval($subscription_id).'1'.get_option('ipn_digest')); // responseDigest must have this value on success
-		$denial_response_digest = md5(strval($denial_id).'0'.get_option('ipn_digest')); // responseDigest must have this value on failure
+		$success_response_digest = md5($subscription_id.'1'.get_option('ipn_digest')); // responseDigest must have this value on success
+		$denial_response_digest = md5($denial_id.'0'.get_option('ipn_digest')); // responseDigest must have this value on failure
 
 		if (($response_digest !== $success_response_digest) && ($response_digest !== $denial_response_digest)) {
 			my_exit(do_lang('IPN_UNVERIFIED')); // Hacker?!!!
@@ -270,13 +270,16 @@ class Hook_ccbill
 		$pending_reason='';
 		$memo='';
 		$mc_gross=post_param('initialPrice');
-		$mc_currency=$this->_currency_numeric_to_alphabetic_code[post_param_integer('baseCurrency')];
+		$mc_currency=post_param_integer('baseCurrency', 0);
+		$mc_currency=$mc_currency===0?get_option('currency'):$this->_currency_numeric_to_alphabetic_code[$mc_currency];
 
 		if (addon_installed('shopping')) {
 			$this->store_shipping_address($purchase_id);
 		}
 
-		return array($purchase_id, $item_name, $payment_status, $reason_code, $pending_reason, $memo, $mc_gross, $mc_currency, $trans_id, '');
+		$ret = array($purchase_id, $item_name, $payment_status, $reason_code, $pending_reason, $memo, $mc_gross, $mc_currency, $trans_id, '');
+
+		return $ret;
 	}
 
 	/**
