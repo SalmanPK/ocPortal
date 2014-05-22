@@ -104,6 +104,20 @@ function dload_script()
 	if (!array_key_exists('extension',$breakdown)) $extension=''; else $extension=strtolower($breakdown['extension']);
 	if (url_is_local($full)) $_full=get_custom_file_base().'/'.rawurldecode(/*filter_naughty*/($full)); else $_full=rawurldecode($full);
 
+	// Send header
+	if ((strpos($myrow['original_filename'],chr(10))!==false) || (strpos($myrow['original_filename'],chr(13))!==false))
+		log_hack_attack_and_exit('HEADER_SPLIT_HACK');
+	if (get_option('immediate_downloads')=='1')
+	{
+		require_code('mime_types');
+		header('Content-Type: '.get_mime_type(get_file_extension($myrow['original_filename'])).'; authoritative=true;');
+		header('Content-Disposition: inline; filename="'.str_replace(chr(13),'',str_replace(chr(10),'',addslashes($myrow['original_filename']))).'"');
+	} else
+	{
+		header('Content-Type: application/octet-stream'.'; authoritative=true;');
+		header('Content-Disposition: attachment; filename="'.str_replace(chr(13),'',str_replace(chr(10),'',addslashes($myrow['original_filename']))).'"');
+	}
+
 	// Is it non-local? If so, redirect
 	if ((!url_is_local($full)) || (!file_exists(get_file_base().'/'.rawurldecode(filter_naughty($full)))))
 	{
@@ -118,32 +132,18 @@ function dload_script()
 	// Some basic security: don't fopen php files
 	if ($extension=='php') log_hack_attack_and_exit('PHP_DOWNLOAD_INNOCENT',integer_format($id));
 
-	// Size, bandwidth, logging
+	// Size, bandwidth
 	$size=filesize($_full);
 	if (is_null($got_before))
 	{
-		$bandwidth=$GLOBALS['SITE_DB']->query_value_null_ok_full('SELECT SUM(file_size) AS answer FROM '.get_table_prefix().'download_logging l LEFT JOIN '.get_table_prefix().'download_downloads d ON l.id=d.id WHERE date_and_time>'.strval(time()-24*60*60*32));
+		$bandwidth=$GLOBALS['SITE_DB']->query_value_null_ok_full('SELECT SUM(file_size) AS answer FROM '.get_table_prefix().'download_logging l LEFT JOIN '.get_table_prefix().'download_downloads d ON l.id=d.id WHERE date_and_time>'.strval(time()-24*60*60*32).' AND date_and_time<='.strval(time()));
 		if ((($bandwidth+floatval($size))>(floatval(get_option('maximum_download'))*1024*1024*1024)) && (!has_specific_permission(get_member(),'bypass_bandwidth_restriction')))
 			warn_exit(do_lang_tempcode('TOO_MUCH_DOWNLOAD'));
 
 		require_code('files2');
 		check_shared_bandwidth_usage($size);
 	}
-	log_download($id,$size,!is_null($got_before));
 
-	// Send header
-	if ((strpos($myrow['original_filename'],chr(10))!==false) || (strpos($myrow['original_filename'],chr(13))!==false))
-		log_hack_attack_and_exit('HEADER_SPLIT_HACK');
-	header('Content-Type: application/octet-stream'.'; authoritative=true;');
-	if (get_option('immediate_downloads')=='1')
-	{
-		require_code('mime_types');
-		header('Content-Type: '.get_mime_type(get_file_extension($myrow['original_filename'])).'; authoritative=true;');
-		header('Content-Disposition: filename="'.str_replace(chr(13),'',str_replace(chr(10),'',addslashes($myrow['original_filename']))).'"');
-	} else
-	{
-		header('Content-Disposition: attachment; filename="'.str_replace(chr(13),'',str_replace(chr(10),'',addslashes($myrow['original_filename']))).'"');
-	}
 	header('Accept-Ranges: bytes');
 
 	// Caching
@@ -191,6 +191,8 @@ function dload_script()
 	header('Content-Length: '.strval($new_length));
 	if (function_exists('set_time_limit')) @set_time_limit(0);
 	error_reporting(0);
+
+	if ($from==0) log_download($id,$size,!is_null($got_before));
 
 	// Send actual data
 	$myfile=fopen($_full,'rb');

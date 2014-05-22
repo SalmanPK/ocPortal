@@ -28,7 +28,7 @@ class Hook_paypal
 	 */
 	function _get_payment_address()
 	{
-		return ecommerce_test_mode()?get_option('ipn_test'):get_option('ipn');
+		return trim(ecommerce_test_mode()?get_option('ipn_test'):get_option('ipn'));
 	}
 
 	/**
@@ -193,20 +193,24 @@ class Hook_paypal
 			if (post_param_integer('recurring')!=1) my_exit(do_lang('IPN_SUB_RECURRING_WRONG'));
 			$txn_id=post_param('subscr_id');
 		}
-		elseif ($txn_type=='subscr_eot' || $txn_type=='subscr_cancel')
+		elseif ($txn_type=='subscr_eot')
 		{
 			$payment_status='SCancelled';
 			$txn_id=post_param('subscr_id').'-c';
+		}
+		elseif ($txn_type=='subscr_cancel')
+		{
+			exit();
 		}
 
 		$primary_paypal_email=get_value('primary_paypal_email');
 
 		if (!is_null($primary_paypal_email))
 		{
-			if ($receiver_email!=$primary_paypal_email) my_exit(do_lang('IPN_EMAIL_ERROR'));
+			if (trim($receiver_email)!=trim($primary_paypal_email)) my_exit(do_lang('IPN_EMAIL_ERROR'));
 		} else
 		{
-			if ($receiver_email!=$this->_get_payment_address()) my_exit(do_lang('IPN_EMAIL_ERROR'));
+			if (trim($receiver_email)!=$this->_get_payment_address()) my_exit(do_lang('IPN_EMAIL_ERROR'));
 		}
 
 		if (addon_installed('shopping'))

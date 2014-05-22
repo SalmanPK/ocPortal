@@ -329,7 +329,7 @@ function get_max_file_size($source_member=NULL,$connection=NULL)
 			$daily_quota=5; // 5 is a hard-coded default for non-OCF forums
 		}
 		if (is_null($connection)) $connection=$GLOBALS['SITE_DB'];
-		$_size_uploaded_today=$connection->query('SELECT SUM(a_file_size) AS the_answer FROM '.$connection->get_table_prefix().'attachments WHERE a_member_id='.strval((integer)$source_member).' AND a_add_time>'.strval(time()-60*60*24));
+		$_size_uploaded_today=$connection->query('SELECT SUM(a_file_size) AS the_answer FROM '.$connection->get_table_prefix().'attachments WHERE a_member_id='.strval((integer)$source_member).' AND a_add_time>'.strval(time()-60*60*24).' AND a_add_time<='.strval(time()));
 		$size_uploaded_today=intval($_size_uploaded_today[0]['the_answer']);
 		$d=$daily_quota*1024*1024-$size_uploaded_today;
 	}
@@ -718,7 +718,7 @@ function _http_download_file($url,$byte_limit=NULL,$trigger_error=true,$no_redir
 				}
 				if ((!is_null($cookies)) && (count($cookies)!=0)) curl_setopt($ch,CURLOPT_COOKIE,$_cookies);
 				$crt_path=get_file_base().'/data/curl-ca-bundle.crt';
-				if (get_value('disable_ssl_for__'.$url_parts['host'])==='1')
+				if ((function_exists('get_value')) && (get_value('disable_ssl_for__'.$url_parts['host'])==='1'))
 					curl_setopt($ch,CURLOPT_SSL_VERIFYPEER,false);
 				if (ini_get('curl.cainfo')=='')
 				{
@@ -741,18 +741,21 @@ function _http_download_file($url,$byte_limit=NULL,$trigger_error=true,$no_redir
 				if (!is_null($auth)) curl_setopt($ch,CURLOPT_USERPWD,implode(':',$auth));
 				if (!is_null($referer))
 					curl_setopt($ch,CURLOPT_REFERER,$referer);
-				$proxy=get_value('proxy',NULL,true);
-				if ($proxy=='') $proxy=NULL;
-				if ((!is_null($proxy)) && ($url_parts['host']!='localhost') && ($url_parts['host']!='127.0.0.1'))
+				if (function_exists('get_value'))
 				{
-					$port=get_value('proxy_port',NULL,true);
-					if (is_null($port)) $port='8080';
-					curl_setopt($ch, CURLOPT_PROXY,$proxy.':'.$port);
-					$proxy_user=get_value('proxy_user',NULL,true);
-					if (!is_null($proxy_user))
+					$proxy=get_value('proxy',NULL,true);
+					if ($proxy=='') $proxy=NULL;
+					if ((!is_null($proxy)) && ($url_parts['host']!='localhost') && ($url_parts['host']!='127.0.0.1'))
 					{
-						$proxy_password=get_value('proxy_password',NULL,true);
-						curl_setopt($ch, CURLOPT_PROXYUSERPWD, $proxy_user.':'.$proxy_password);
+						$port=get_value('proxy_port',NULL,true);
+						if (is_null($port)) $port='8080';
+						curl_setopt($ch, CURLOPT_PROXY,$proxy.':'.$port);
+						$proxy_user=get_value('proxy_user',NULL,true);
+						if (!is_null($proxy_user))
+						{
+							$proxy_password=get_value('proxy_password',NULL,true);
+							curl_setopt($ch, CURLOPT_PROXYUSERPWD, $proxy_user.':'.$proxy_password);
+						}
 					}
 				}
 				if (!is_null($byte_limit)) curl_setopt($ch,CURLOPT_RANGE,'0-'.strval(($byte_limit==0)?0:($byte_limit-1)));

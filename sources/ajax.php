@@ -472,6 +472,7 @@ function ajax_tree_script()
 	echo ($html_mask?'<html>':'<request>');
 	$_options=get_param('options','',true);
 	if ($_options=='') $_options=serialize(array());
+	secure_serialized_data($_options);
 	$options=unserialize($_options);
 	$val=$object->run($id,$options,get_param('default',NULL,true));
 	echo str_replace('</body>','<br id="ended" /></body>',$val);
@@ -557,7 +558,7 @@ function snippet_script()
 	@ini_set('zlib.output_compression','Off');
 	$size=strlen($out);
 	header('Connection: close');
-	ignore_user_abort(true);
+	@ignore_user_abort(true);
 	header('Content-Encoding: none');
 	header('Content-Length: '.strval($size));
 	echo $out;

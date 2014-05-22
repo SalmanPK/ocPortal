@@ -239,7 +239,7 @@ class Module_cms_comcode_pages
 		if (($_dir===false) && (function_exists('glob'))) $_dir=array();
 		if ($_dir===false)
 		{
-			if (@mkdir($dir,0777)===false)
+			if (@mkdir($dir,0777,true)===false)
 			{
 				if (substr($subdir,0,14)!='comcode_custom') return array();
 				warn_exit(do_lang_tempcode('WRITE_ERROR_DIRECTORY_REPAIR',escape_html($dir)));
@@ -1074,7 +1074,10 @@ class Module_cms_comcode_pages
 				'p_parent_page'=>$new_file,
 			),array('the_zone'=>$zone,'p_parent_page'=>$file));
 
-			$GLOBALS['SITE_DB']->query_update('catalogue_fields f JOIN '.$GLOBALS['SITE_DB']->get_table_prefix().'catalogue_efv_short v ON v.cf_id=f.id',array('cv_value'=>$new_file),array('cv_value'=>$file,'cf_type'=>'comcode_page'));
+			if (addon_installed('catalogues'))
+			{
+				$GLOBALS['SITE_DB']->query_update('catalogue_fields f JOIN '.$GLOBALS['SITE_DB']->get_table_prefix().'catalogue_efv_short v ON v.cf_id=f.id',array('cv_value'=>$new_file),array('cv_value'=>$file,'cf_type'=>'comcode_page'));
+			}
 
 			foreach ($rename_map as $path=>$new_path)
 			{

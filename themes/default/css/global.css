@@ -342,7 +342,7 @@ iframe {
 		overflow-x: visible !important;
 		overflow-y: visible !important;
 	}
-	col {
+	.field_name_column, .field_input_column {
 		width: auto !important;
 	}
 	* {
@@ -378,14 +378,14 @@ body.website_body.frame {
 
 {+START,IF,{$CONFIG_OPTION,fixed_width}}{+START,IF,{$NOT,{$MOBILE}}}
 	html>body#main_website { /* #main_website targets only the main site screen, avoiding frames etc */
-		background-color: {$GET,fixed_width_background};
-		background-attachment: fixed;
-
 		/* Want to change the tiled background?
 			Try this Google search to get image ideas http://www.google.co.uk/search?tbm=isch&q=tile+background
 			Find how to edit the referenced "outer_background" theme image by doing an Admin Zone search for "outer_background"
 		*/
 		background: url('{$IMG;,outer_background}');
+
+		background-color: {$GET,fixed_width_background};
+		background-attachment: fixed;
 	}
 	#main_website #main_website_inner {
 		width: 980px;
@@ -402,6 +402,8 @@ body.website_body, #htmlarea {
 }
 #htmlarea {
 	margin: 0;
+	color: {$GET,slightly_seeded_text};
+	background-color: {$GET,main_background};
 }
 
 body#main_website {
@@ -1161,6 +1163,9 @@ div.red_alert, p.red_alert {
 }
 
 /* Used for a little 'X comments' box, but with the comments bit showing as an HTML tooltip */
+.comment_count:empty {
+	display: none;
+}
 .comment_count {
 	display: inline-block;
 	white-space: nowrap;
@@ -3078,6 +3083,10 @@ a.tab, a.tab:visited, a.tab:hover {
 	{$BETA_CSS_PROPERTY,opacity: 0.6;}
 }
 
+.tab, .tab:hover {
+	color: {$GET,a.link};
+}
+
 .tab_active {
 	text-shadow: 1px 1px 1px {$GET,standard_border};
 	{$BETA_CSS_PROPERTY,opacity: 1 !important;}
@@ -3085,9 +3094,6 @@ a.tab, a.tab:visited, a.tab:hover {
 
 .tab:hover {
 	text-decoration: underline !important;
-}
-.tab:hover, body.touch_enabled .tab {
-	{$BETA_CSS_PROPERTY,opacity: 1;}
 }
 
 .tab strong {
@@ -3804,6 +3810,7 @@ figure {
 
 .attachment_left .attachment, .attachment_right .attachment {
 	width: 200px;
+	white-space: normal;
 }
 
 .attachment_img {

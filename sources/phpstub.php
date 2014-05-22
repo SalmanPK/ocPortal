@@ -1098,6 +1098,39 @@ function get_class($obj)
 }
 
 /**
+ * Gets the class methods' names.
+ *
+ * @param  mixed		The class name or an object instance.
+ * @return ?array		An array of method names defined (NULL: error).
+ */
+function get_class_methods($class_name)
+{
+	return array();
+}
+
+/**
+ * Get the default properties of the class.
+ *
+ * @param  string		The class name.
+ * @return ~array		An associative array of declared properties visible from the current scope, with their default value (false: error).
+ */
+function get_class_vars($class_name)
+{
+	return array();
+}
+
+/**
+ * Gets the properties of the given object.
+ *
+ * @param  object		An object instance.
+ * @return array		An associative array of defined object accessible non-static properties.
+ */
+function get_object_vars($object)
+{
+	return array();
+}
+
+/**
  * Returns the translation table used by htmlspecialchars and htmlentities.
  *
  * @param  integer	The table to select (HTML_ENTITIES or HTML_SPECIALCHARS).
@@ -2471,9 +2504,10 @@ function min($arg1,$arg2=NULL,$arg3=NULL,$arg4=NULL,$arg5=NULL,$arg6=NULL,$arg7=
  *
  * @param  PATH		The path to the directory to make.
  * @param  integer	The mode (e.g. 0777).
+ * @param  boolean	Do recursively.
  * @return boolean	Success status.
  */
-function mkdir($path,$mode)
+function mkdir($path,$mode,$recursive=false)
 {
 	return false;
 }

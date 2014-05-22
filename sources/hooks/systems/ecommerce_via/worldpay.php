@@ -22,10 +22,16 @@ class Hook_worldpay
 {
 
 	// Requires:
-	//  callback URL set in control panel ('CMS') to be set to "http://<WPDISPLAY ITEM=MC_callback>"
-	//  digest password sent as 'secret' to WorldPay tech support
-	//  account must be set as 'live' in control panel ('CMS') once testing is done
-	//  WorldPay-side payment pages will probably want customing
+	//  the "Payment Response URL" set in control panel should be set to "http://<WPDISPLAY ITEM=MC_callback>"
+	//  the "Payment Response enabled?" and "Enable Recurring Payment Response" and "Enable the Shopper Response" and "Suspension of Payment Response" should all be ticked (checked)
+	//  the "Payment Response password" is the ocPortal "Callback password" option; it may be blank
+	//  the "Installation ID" (a number given to you) is the ocPortal "Gateway username" and also "Testing mode gateway username" (it's all the same installation ID)
+	//  the "MD5 secret for transactions" is the ocPortal "Gateway digest code" option; it may be blank
+	//  the account must be set as 'live' in control panel once testing is done
+	//  the "Shopper Redirect URL" should be set to "http://<baseurl>/site/index.php?page=purchase&type=finish"
+	//   (typically -- but page=shopping if you use the shopping module, or nothing at all and create custom payment response pages if you use multiple eCommerce types)
+	//   (although actually "Shopper Redirect URL" does not seem to work at all http://stackoverflow.com/questions/8232607/how-do-i-create-returning-page-setting-with-worldpay - so actually you should create custom payment response pages)
+	//  WorldPay-side custom payment response pages will probably want customing (http://www.worldpay.com/support/kb/bg/customisingadvanced/custa.html)
 	//  Logos, refund policies, and contact details [e-mail, phone, postal], may need coding into the templates
 	//  FuturePay must be enabled for subscriptions to work (contact WorldPay about it)
 
@@ -46,7 +52,7 @@ class Hook_worldpay
 	 */
 	function get_ipn_url()
 	{
-		return 'https://select.worldpay.com/wcc/purchase';
+		return 'https://'.(ecommerce_test_mode()?'select-test':'select').'.worldpay.com/wcc/purchase';
 	}
 
 	/**
@@ -102,7 +108,7 @@ class Hook_worldpay
 			'e_length'=>NULL,
 			'e_length_units'=>'',
 		));
-		return do_template('ECOM_BUTTON_VIA_WORLDPAY',array('_GUID'=>'56c78a4e16c0e7f36fcfbe57d37bc3d3','PRODUCT'=>$product,'ITEM_NAME'=>$item_name,'DIGEST'=>$digest,'TEST_MODE'=>ecommerce_test_mode(),'PURCHASE_ID'=>strval($trans_id),'AMOUNT'=>float_to_raw_string($amount),'CURRENCY'=>$currency,'USERNAME'=>$username,'IPN_URL'=>$ipn_url,'EMAIL_ADDRESS'=>$email_address));
+		return do_template('ECOM_BUTTON_VIA_WORLDPAY',array('_GUID'=>'56c78a4e16c0e7f36fcfbe57d37bc3d3','PRODUCT'=>$product,'ITEM_NAME'=>$item_name,'DIGEST'=>$digest,'TEST_MODE'=>ecommerce_test_mode(),'PURCHASE_ID'=>$trans_id,'AMOUNT'=>float_to_raw_string($amount),'CURRENCY'=>$currency,'USERNAME'=>$username,'IPN_URL'=>$ipn_url,'EMAIL_ADDRESS'=>$email_address));
 	}
 
 	/**
@@ -157,7 +163,7 @@ class Hook_worldpay
 			'e_length'=>NULL,
 			'e_length_units'=>'',
 		));
-		return do_template('ECOM_SUBSCRIPTION_BUTTON_VIA_WORLDPAY',array('_GUID'=>'1f88716137762a467edbf5fbb980c6fe','PRODUCT'=>$product,'DIGEST'=>$digest,'TEST'=>ecommerce_test_mode(),'LENGTH'=>strval($length),'LENGTH_UNITS_2'=>$length_units_2,'ITEM_NAME'=>$item_name,'PURCHASE_ID'=>strval($trans_id),'AMOUNT'=>float_to_raw_string($amount),'FIRST_REPEAT'=>date('Y-m-d',$first_repeat),'CURRENCY'=>$currency,'USERNAME'=>$username,'IPN_URL'=>$ipn_url));
+		return do_template('ECOM_SUBSCRIPTION_BUTTON_VIA_WORLDPAY',array('_GUID'=>'1f88716137762a467edbf5fbb980c6fe','PRODUCT'=>$product,'DIGEST'=>$digest,'TEST'=>ecommerce_test_mode(),'LENGTH'=>strval($length),'LENGTH_UNITS_2'=>$length_units_2,'ITEM_NAME'=>$item_name,'PURCHASE_ID'=>$trans_id,'AMOUNT'=>float_to_raw_string($amount),'FIRST_REPEAT'=>date('Y-m-d',$first_repeat),'CURRENCY'=>$currency,'USERNAME'=>$username,'IPN_URL'=>$ipn_url));
 	}
 
 	/**
@@ -249,9 +255,9 @@ class Hook_worldpay
 		else $_url=build_url(array('page'=>'purchase','type'=>'finish','cancel'=>1,'message'=>do_lang_tempcode('DECLINED_MESSAGE',$message)),get_module_zone('purchase'));
 		$url=$_url->evaluate();
 
-		echo http_download_file($url);
+		echo http_download_file($url,NULL,false); // WorldPay may or may not show the result of this, depending on if it is 'secure'. It does not actually redirect to the proper target URL like the config implies it should.
 
-		if(addon_installed('shopping'))
+		if (addon_installed('shopping'))
 		{
 			$this->store_shipping_address($purchase_id);
 		}
