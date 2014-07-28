@@ -286,6 +286,15 @@ function init__global2()
 
 	// Most critical things
 	require_code('support'); // A lot of support code is present in this
+	if (!running_script('webdav'))
+	{
+		$http_method=ocp_srv('REQUEST_METHOD');
+		if ($http_method!='GET' && $http_method!='POST' && $http_method!='HEAD' && $http_method!='')
+		{
+			header('HTTP/1.0 405 Method Not Allowed');
+			exit();
+		}
+	}
 	srand(make_seed());
 	mt_srand(make_seed());
 	if (($MICRO_BOOTUP==0) && ($MICRO_AJAX_BOOTUP==0)) // Fast cacheing for bots
@@ -932,14 +941,17 @@ function is_browser_decacheing()
 	global $BROWSER_DECACHEING;
 	if ($BROWSER_DECACHEING!==NULL) return $BROWSER_DECACHEING;
 
-	if (is_null(get_value('ran_once')))
+	if (is_null(get_value('ran_once'))) // Track whether ocPortal has run at least once
 	{
 		set_value('ran_once','1');
 		return true;
 	}
-	$header_method=(array_key_exists('HTTP_CACHE_CONTROL',$_SERVER)) && ($_SERVER['HTTP_CACHE_CONTROL']=='no-cache') && (ocp_srv('REQUEST_METHOD')!='POST') && ((!function_exists('browser_matches')) || (!browser_matches('opera')));
+
+	return false;	// This technique stopped working well, Chrome sends cache-control too freely
+
+	/*$header_method=(array_key_exists('HTTP_CACHE_CONTROL',$_SERVER)) && ($_SERVER['HTTP_CACHE_CONTROL']=='no-cache') && (ocp_srv('REQUEST_METHOD')!='POST') && ((!function_exists('browser_matches')) || (!browser_matches('opera')));
 	$BROWSER_DECACHEING=(($header_method) && ((array_key_exists('FORUM_DRIVER',$GLOBALS)) && (has_actual_page_access(get_member(),'admin_cleanup')) || ($GLOBALS['IS_ACTUALLY_ADMIN'])));
-	return $BROWSER_DECACHEING;
+	return $BROWSER_DECACHEING;*/
 }
 
 /**
@@ -1997,13 +2009,13 @@ function css_tempcode($inline=false,$only_global=false,$context=NULL,$theme=NULL
 		{
 			if (!$text_only)
 			{
-				$_css=do_template($c,NULL,user_lang(),false,NULL,'.css','css',$theme);
-				$__css=$_css->evaluate();
 				if ($context!==NULL)
 				{
-					$__css=filter_css($__css,$context);
+					$__css=filter_css($c,$theme,$context);
 				} else
 				{
+					$_css=do_template($c,NULL,user_lang(),false,NULL,'.css','css',$theme);
+					$__css=$_css->evaluate();
 					$__css=str_replace('} ','}'.chr(10),preg_replace('#\s+#',' ',$__css));
 				}
 

@@ -896,7 +896,8 @@ class Module_cms_catalogues extends standard_aed_module
 		}
 
 		// Open CSV file
-		$handle=fopen($csv_name,'rb');
+		@ini_set('auto_detect_line_endings','1');
+		$handle=fopen($csv_name,'rt');
 
 		// Read column names
 		$del=',';
@@ -1245,6 +1246,8 @@ class Module_cms_catalogues extends standard_aed_module
 
 		header('Content-type: text/csv');
 		header('Content-Disposition: attachment; filename="'.str_replace(chr(13),'',str_replace(chr(10),'',addslashes($filename))).'"');
+
+		if (ocp_srv('REQUEST_METHOD')=='HEAD') return '';
 
 		@ini_set('ocproducts.xss_detect','0');
 

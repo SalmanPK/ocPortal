@@ -42,6 +42,8 @@ function output_ical()
 	header('Content-Type: text/calendar');
 	header('Content-Disposition: inline; filename="export.ics"');
 
+	if (ocp_srv('REQUEST_METHOD')=='HEAD') return '';
+
 	if (function_exists('set_time_limit')) @set_time_limit(0);
 
 	$filter=get_param_integer('type_filter',NULL);
@@ -79,9 +81,9 @@ function output_ical()
 			{
 				echo "BEGIN:VEVENT\n";
 
-				echo "DTSTAMP:".date('Ymd',time())."T".date('His',$event['e_add_date'])."\n";
-				echo "CREATED:".date('Ymd',time())."T".date('His',$event['e_add_date'])."\n";
-				if (!is_null($event['e_edit_date'])) echo "LAST-MODIFIED:".date('Ymd',time())."T".date('His',$event['e_edit_date'])."\n";
+				echo "DTSTAMP:".date('Ymd',$event['e_add_date'])."T".date('His',$event['e_add_date'])."\n";
+				echo "CREATED:".date('Ymd',$event['e_add_date'])."T".date('His',$event['e_add_date'])."\n";
+				if (!is_null($event['e_edit_date'])) echo "LAST-MODIFIED:".date('Ymd',$event['e_edit_date'])."T".date('His',$event['e_edit_date'])."\n";
 
 				echo "SUMMARY:".ical_escape(get_translated_text($event['e_title']))."\n";
 				$description=get_translated_text($event['e_content']);
@@ -98,7 +100,7 @@ function output_ical()
 						echo "ATTACH;FMTTYPE=".ical_escape(get_mime_type($attachment['a_original_filename'])).":".ical_escape(find_script('attachments').'?id='.strval($attachment['id']))."\n";
 					}
 				}
-				echo "DESCRIPTION:".ical_escape($description)."\n";
+				echo "DESCRIPTION:".ical_escape(strip_comcode($description))."\n";
 
 				if (!is_guest($event['e_submitter']))
 				{
@@ -127,7 +129,7 @@ function output_ical()
 						foreach ($_comments as $comment)
 						{
 							if ($comment['title']!='') $comment['message']=$comment['title'].': '.$comment['message'];
-							echo "COMMENT:".ical_escape($comment['message'].' - '.$GLOBALS['FORUM_DRIVER']->get_username($comment['user']).' ('.get_timezoned_date($comment['date']).')')."\n";
+							echo "COMMENT:".ical_escape(strip_comcode($comment['message']).' - '.$GLOBALS['FORUM_DRIVER']->get_username($comment['user']).' ('.get_timezoned_date($comment['date']).')')."\n";
 						}
 					}
 					$start+=1000;

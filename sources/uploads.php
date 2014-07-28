@@ -196,6 +196,8 @@ function get_url($specify_name,$attach_name,$upload_folder,$obfuscate=0,$enforce
 		}
 	}
 
+	if (count($_FILES)!=0) ocp_profile_start_for('get_url');
+
 	if ($obfuscate==3) $accept_errors=true;
 
 	$thumb_folder=(strpos($upload_folder,'uploads/galleries')!==false)?str_replace('uploads/galleries','uploads/galleries_thumbs',$upload_folder):($upload_folder.'_thumbs');
@@ -491,6 +493,8 @@ function get_url($specify_name,$attach_name,$upload_folder,$obfuscate=0,$enforce
 	// For reentrance of previews
 	if ($specify_name!='') $_POST[$specify_name]=array_key_exists(0,$out)?$out[0]:'';
 	if ($thumb_specify_name!='') $_POST[$thumb_specify_name]=array_key_exists(1,$out)?$out[1]:'';
+
+	if (count($_FILES)!=0) ocp_profile_end_for('get_url',$attach_name);
 
 	return $out;
 }

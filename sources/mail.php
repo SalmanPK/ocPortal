@@ -38,6 +38,11 @@ function init__mail()
  */
 function _mail_img_rep_callback($matches)
 {
+	if ((!url_is_local($matches[0])) && (substr($matches[2],0,strlen(get_custom_base_url()))!=get_custom_base_url()) && (substr($matches[2],0,strlen(get_base_url()))!=get_base_url()))
+	{
+		return $matches[0];
+	}
+
 	global $CID_IMG_ATTACHMENT;
 	$cid=uniqid('',true).'@'.str_replace(' ','_',get_domain()); // str_replace is in case someone has put in the domain wrong
 	$CID_IMG_ATTACHMENT[$cid]=$matches[2];
@@ -54,9 +59,12 @@ function _mail_css_rep_callback($matches)
 {
 	global $CID_IMG_ATTACHMENT;
 	$cid=uniqid('',true).'@'.get_domain();
-	if ((basename($matches[1])!='keyboard.png') && (basename($matches[1])!='email_link.png') && (basename($matches[1])!='external_link.png'))
+	if ((basename($matches[1])!='block_background.png') && (basename($matches[1])!='gradient.png') && (basename($matches[1])!='keyboard.png') && (basename($matches[1])!='email_link.png') && (basename($matches[1])!='external_link.png'))
+	{
 		$CID_IMG_ATTACHMENT[$cid]=$matches[1];
-	return 'url(\'cid:'.$cid.'\')';
+		return 'url(\'cid:'.$cid.'\')';
+	}
+	return 'none';
 }
 
 /**
@@ -203,14 +211,19 @@ http://people.dsv.su.se/~jpalme/ietf/ietf-mail-attributes.html
  * @param  boolean		HTML-only
  * @param  boolean		Whether to bypass queueing, because this code is running as a part of the queue management tools
  * @param  ID_TEXT		The template used to show the email
- * @param  boolean		Whether to bypass queueing
+ * @param  ?boolean		Whether to bypass queueing (NULL: auto-decide)
  * @return ?tempcode		A full page (not complete XHTML) piece of tempcode to output (NULL: it worked so no tempcode message)
  */
-function mail_wrap($subject_line,$message_raw,$to_email=NULL,$to_name=NULL,$from_email='',$from_name='',$priority=3,$attachments=NULL,$no_cc=false,$as=NULL,$as_admin=false,$in_html=false,$coming_out_of_queue=false,$mail_template='MAIL',$bypass_queue=false)
+function mail_wrap($subject_line,$message_raw,$to_email=NULL,$to_name=NULL,$from_email='',$from_name='',$priority=3,$attachments=NULL,$no_cc=false,$as=NULL,$as_admin=false,$in_html=false,$coming_out_of_queue=false,$mail_template='MAIL',$bypass_queue=NULL)
 {
 	if (running_script('stress_test_loader')) return NULL;
 
 	if (@$GLOBALS['SITE_INFO']['no_email_output']==='1') return NULL;
+
+	if (is_null($bypass_queue))
+	{
+		$bypass_queue=($priority<3);
+	}
 
 	global $EMAIL_ATTACHMENTS;
 	$EMAIL_ATTACHMENTS=array();
@@ -222,10 +235,10 @@ function mail_wrap($subject_line,$message_raw,$to_email=NULL,$to_name=NULL,$from
 
 	if (!$coming_out_of_queue)
 	{
-		if (!$GLOBALS['SITE_DB']->table_is_locked('logged_mail_messages'))
+		if ((mt_rand(0,100)==1) && (!$GLOBALS['SITE_DB']->table_is_locked('logged_mail_messages')))
 			$GLOBALS['SITE_DB']->query('DELETE FROM '.get_table_prefix().'logged_mail_messages WHERE m_date_and_time<'.strval(time()-60*60*24*14).' AND m_queued=0'); // Log it all for 2 weeks, then delete
 
-		$through_queue=(!$bypass_queue) && ((get_option('mail_queue_debug')==='1') || ((get_option('mail_queue')==='1') && (cron_installed())));
+		$through_queue=(!$bypass_queue) && ((get_option('mail_queue')==='1') || ((get_option('mail_queue_debug')==='1') && (cron_installed())));
 
 		$GLOBALS['SITE_DB']->query_insert('logged_mail_messages',array(
 			'm_subject'=>substr($subject_line,0,255),
@@ -302,6 +315,9 @@ function mail_wrap($subject_line,$message_raw,$to_email=NULL,$to_name=NULL,$from
 	$from_name=str_replace("\r",'',$from_name);
 	$from_name=str_replace("\n",'',$from_name);
 
+	if (!$coming_out_of_queue)
+		ocp_profile_start_for('mail_wrap');
+
 	$theme=method_exists($GLOBALS['FORUM_DRIVER'],'get_theme')?$GLOBALS['FORUM_DRIVER']->get_theme():'default';
 	if ($theme=='default') // Sucks, probably due to sending from Admin Zone...
 	{
@@ -354,15 +370,56 @@ function mail_wrap($subject_line,$message_raw,$to_email=NULL,$to_name=NULL,$from
 
 	$simplify_when_can=true; // Used for testing. Not actually needed
 
+	global $CID_IMG_ATTACHMENT;
+	$CID_IMG_ATTACHMENT=array();
+
 	// Evaluate message. Needs doing early so we know if we have any headers
-	$GLOBALS['NO_LINK_TITLES']=true;
-	global $LAX_COMCODE;
-	$temp=$LAX_COMCODE;
-	$LAX_COMCODE=true;
-	$html_content=comcode_to_tempcode($message_raw,$as,$as_admin);
-	$LAX_COMCODE=$temp;
-	$GLOBALS['NO_LINK_TITLES']=false;
-	$attachments=array_merge(is_null($attachments)?array():$attachments,$EMAIL_ATTACHMENTS);
+	if (!$in_html)
+	{
+		$cache_sig=serialize(array(
+			$lang,
+			$mail_template,
+			$subject,
+			$theme,
+			crc32($message_raw),
+		));
+
+		static $html_content_cache=array();
+		if (isset($html_content_cache[$cache_sig]))
+		{
+			list($html_evaluated,$message_plain,$EMAIL_ATTACHMENTS)=$html_content_cache[$cache_sig];
+		} else
+		{
+			$GLOBALS['NO_LINK_TITLES']=true;
+			global $LAX_COMCODE;
+			$temp=$LAX_COMCODE;
+			$LAX_COMCODE=true;
+			$html_content=comcode_to_tempcode($message_raw,$as,$as_admin);
+			$LAX_COMCODE=$temp;
+			$GLOBALS['NO_LINK_TITLES']=false;
+
+			$_html_content=$html_content->evaluate($lang);
+			$_html_content=preg_replace('#(keep|for)_session=[\d\w]*#','filtered=1',$_html_content);
+			$message_html=(strpos($_html_content,'<html')!==false)?make_string_tempcode($_html_content):do_template($mail_template,array('_GUID'=>'b23069c20202aa59b7450ebf8d49cde1','CSS'=>'{CSS}','LOGOURL'=>get_logo_url(''),/*'LOGOMAP'=>get_option('logo_map'),*/'LANG'=>$lang,'TITLE'=>$subject,'CONTENT'=>$_html_content),$lang,false,NULL,'.tpl','templates',$theme);
+			$css=css_tempcode(true,true,$message_html->evaluate($lang),$theme);
+			$_css=$css->evaluate($lang);
+			if (get_option('allow_ext_images')!='1')
+			{
+				$_css=preg_replace_callback('#url\(["\']?(http://[^"]*)["\']?\)#U','_mail_css_rep_callback',$_css);
+			}
+			$html_evaluated=$message_html->evaluate($lang);
+			$html_evaluated=str_replace('{CSS}',$_css,$html_evaluated);
+
+			// Cleanup the Comcode a bit
+			$message_plain=comcode_to_clean_text($message_raw);
+
+			$html_content_cache[$cache_sig]=array($html_evaluated,$message_plain,$EMAIL_ATTACHMENTS);
+		}
+		$attachments=array_merge(is_null($attachments)?array():$attachments,$EMAIL_ATTACHMENTS);
+	} else
+	{
+		$html_evaluated=$message_raw;
+	}
 
 	// Headers
 	$website_email=get_option('website_email');
@@ -400,31 +457,7 @@ function mail_wrap($subject_line,$message_raw,$to_email=NULL,$to_name=NULL,$from
 		$sending_message.='Content-Type: multipart/alternative;'."\n\t".'boundary="'.$boundary2.'"'.$line_term.$line_term.$line_term;
 	}
 
-	global $CID_IMG_ATTACHMENT;
-	$CID_IMG_ATTACHMENT=array();
-
-	// Message starts (actually: it is kind of in header form also as it uses mime multi-part)
-	if (!$in_html)
-	{
-		$_html_content=$html_content->evaluate($lang);
-		$_html_content=preg_replace('#(keep|for)_session=[\d\w]*#','filtered=1',$_html_content);
-		$message_html=(strpos($_html_content,'<html')!==false)?make_string_tempcode($_html_content):do_template($mail_template,array('_GUID'=>'b23069c20202aa59b7450ebf8d49cde1','CSS'=>'{CSS}','LOGOURL'=>get_logo_url(''),/*'LOGOMAP'=>get_option('logo_map'),*/'LANG'=>$lang,'TITLE'=>$subject,'CONTENT'=>$_html_content),$lang,false,NULL,'.tpl','templates',$theme);
-		$css=css_tempcode(true,true,$message_html->evaluate($lang),$theme);
-		$_css=$css->evaluate($lang);
-		if (get_option('allow_ext_images')!='1')
-		{
-			$_css=preg_replace_callback('#url\(["\']?(http://[^"]*)["\']?\)#U','_mail_css_rep_callback',$_css);
-		}
-		$html_evaluated=$message_html->evaluate($lang);
-		$html_evaluated=str_replace('{CSS}',$_css,$html_evaluated);
-
-		// Cleanup the Comcode a bit
-		$message_plain=comcode_to_clean_text($message_raw);
-	} else
-	{
-		$html_evaluated=$message_raw;
-	}
-
+	// Message starts (actually: it is kind of in header form also as it uses mime multi-part)...
 
 	$base64_encode=(get_value('base64_emails')==='1'); // More robust, but more likely to be spam-blocked, and some servers can scramble it.
 
@@ -721,6 +754,9 @@ function mail_wrap($subject_line,$message_raw,$to_email=NULL,$to_name=NULL,$from
 		}
 	}
 
+	if (!$coming_out_of_queue)
+		ocp_profile_end_for('mail_wrap',$subject_line);
+
 	if (!$worked)
 	{
 		$SENDING_MAIL=false;
@@ -742,19 +778,30 @@ function mail_wrap($subject_line,$message_raw,$to_email=NULL,$to_name=NULL,$from
  * Filter out any CSS selector blocks from the given CSS if they definitely do not affect the given (X)HTML.
  * Whilst this is a clever algorithm, it isn't so clever as to actually try and match each selector against a DOM tree. If any segment of a compound selector matches, match is assumed.
  *
- * @param  string			CSS
+ * @param  ID_TEXT		CSS file
+ * @param  ID_TEXT		Theme
  * @param  string			(X)HTML context under which CSS is filtered
  * @return string			Filtered CSS
  */
-function filter_css($css,$context)
+function filter_css($c,$theme,$context)
 {
+	// Reduce input parameters to critical components, and cache on - saves a lot of time if multiple emails sent by script
+	static $cache=array();
+	$simple_sig=preg_replace('#\s+(?!class)(?!id)[\w\-]+="[^"<>]*"#','',preg_replace('#[^<>]*(<[^<>]+>)[^<>]*#s','${1}',$context));
+	$simple_sig.=$c.$theme;
+	if (isset($cache[$simple_sig]))
+		return $cache[$simple_sig];
+
+	$_css=do_template($c,NULL,user_lang(),false,NULL,'.css','css',$theme);
+	$css=$_css->evaluate();
+
 	// Find out all our IDs
 	$ids=array();
 	$matches=array();
 	$count=preg_match_all('#\sid=["\']([^"\']*)["\']#',$context,$matches);
 	for ($i=0;$i<$count;$i++)
 	{
-		$ids[]=$matches[1][$i];
+		$ids[$matches[1][$i]]=true;
 	}
 
 	// Find out all our classes
@@ -764,6 +811,15 @@ function filter_css($css,$context)
 	{
 		if ($matches[1][$i]=='') continue;
 		$classes=array_merge($classes,preg_split('#\s+#',$matches[1][$i],-1,PREG_SPLIT_NO_EMPTY));
+	}
+	$classes=array_flip($classes);
+
+	// Find all our XHTML tags
+	$tags=array();
+	$count=preg_match_all('#<(\w+)([^\w])#',$context,$matches);
+	for ($i=0;$i<$count;$i++)
+	{
+		$tags[$matches[1][$i]]=true;
 	}
 
 	// Strip comments from CSS. This optimises, and also avoids us needing to do a sophisticated parse
@@ -795,33 +851,44 @@ function filter_css($css,$context)
 						$selector=trim($selector);
 
 						if (strpos($selector,'@media print')!==false) break;
+						if (strpos($selector,'::selection')!==false) continue;
+						if (strpos($selector,'a[href^="mailto:"]')!==false) continue;
+						if (strpos($selector,'a[target="_blank"]')!==false) continue;
 
-						// We let all tag-name selectors through if the tag exists in the document, unless they contain a class/ID specifier -- in which case we toe to the presence of that class/ID
-						if ((strpos($selector,'.')===false) && (strpos($selector,'#')===false) && (preg_match('#(^|\s)(\w+)([\[\#\.:\s]|$)#',$selector,$matches)!=0))
-						{
-							$applies=true;
-							break;
-						}
+						$matches=array();
 
 						// ID selectors
-						foreach ($ids as $id)
+						$num_matches=preg_match_all('#\#(\w+)#',$selector,$matches);
+						for ($i=0;$i<$num_matches;$i++)
 						{
-							if (preg_match('#\#'.preg_quote($id,'#').'([\[\.:\s]|$)#',$selector)!=0)
+							if (!isset($ids[$matches[1][$i]]))
 							{
-								$applies=true;
-								break;
+								continue 2;
 							}
 						}
 
 						// Class name selectors
-						foreach ($classes as $class)
+						$num_matches=preg_match_all('#\.(\w+)#',$selector,$matches);
+						for ($i=0;$i<$num_matches;$i++)
 						{
-							if (preg_match('#\.'.preg_quote($class,'#').'([\[\#:\s]|$)#',$selector)!=0)
+							if (!isset($classes[$matches[1][$i]]))
 							{
-								$applies=true;
-								break;
+								continue 2;
 							}
 						}
+
+						// Tag selectors
+						$num_matches=preg_match_all('#(^|\s|>)(\w+)#',$selector,$matches);
+						for ($i=0;$i<$num_matches;$i++)
+						{
+							if (!isset($tags[$matches[2][$i]]))
+							{
+								continue 2;
+							}
+						}
+
+						$applies=true;
+						break;
 					}
 					if ($applies)
 					{
@@ -841,6 +908,8 @@ function filter_css($css,$context)
 		}
 	}
 	while (true);
+
+	$cache[$simple_sig]=$css_new;
 
 	return $css_new;
 }
@@ -877,8 +946,9 @@ function form_to_email_entry_script()
  * @param  string		The intro text to the mail.
  * @param  ?array		A map of fields to field titles to transmit. (NULL: all posted fields, except subject and email)
  * @param  ?string	Email address to send to (NULL: look from post environment / staff address).
+ * @param  boolean	Whether $fields refers to some POSTed fields, as opposed to a direct field->value map.
  */
-function form_to_email($subject=NULL,$intro='',$fields=NULL,$to_email=NULL)
+function form_to_email($subject=NULL,$intro='',$fields=NULL,$to_email=NULL,$is_via_post=true)
 {
 	if (is_null($subject)) $subject=post_param('subject',get_site_name());
 	if (is_null($fields))
@@ -896,12 +966,24 @@ function form_to_email($subject=NULL,$intro='',$fields=NULL,$to_email=NULL)
 
 	$message_raw=$intro;
 	if ($message_raw!='') $message_raw.="\n\n------------\n\n";
-	foreach ($fields as $field=>$field_title)
+
+	if ($is_via_post)
 	{
-		$field_val=post_param($field,NULL);
-		if (!is_null($field_val))
-			$message_raw.=$field_title.': '.$field_val."\n\n";
+		foreach ($fields as $field=>$field_title)
+		{
+			$field_val=post_param($field,NULL);
+			if (!is_null($field_val))
+				$message_raw.=$field_title.': '.$field_val."\n\n";
+		}
+	} else
+	{
+		foreach ($fields as $field_title=>$field_val)
+		{
+			if (!is_null($field_val))
+				$message_raw.=$field_title.': '.$field_val."\n\n";
+		}
 	}
+
 	$from_email=trim(post_param('email',''));
 
 	$to_name=mixed();

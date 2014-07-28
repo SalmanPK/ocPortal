@@ -436,7 +436,14 @@ function get_search_rows($meta_type,$meta_id_field,$content,$boolean_search,$boo
 //		$where_clause.=' AND ';
 //		$where_clause.='z.category_name IS NOT NULL';
 
-		$cat_access=list_to_map('category_name',$GLOBALS['SITE_DB']->query('SELECT category_name FROM '.$GLOBALS['SITE_DB']->get_table_prefix().'group_category_access WHERE '.db_string_equal_to('module_the_name',$permissions_module).(($g_or!='')?(' AND ('.$g_or.')'):'')));
+		global $SITE_INFO;
+		if (((isset($SITE_INFO['mysql_old'])) && ($SITE_INFO['mysql_old']=='1')) || ((!isset($SITE_INFO['mysql_old'])) && (is_file(get_file_base().'/mysql_old'))))
+		{
+			$cat_access=$GLOBALS['FORUM_DB']->query('SELECT DISTINCT category_name FROM '.$GLOBALS['FORUM_DB']->get_table_prefix().'group_category_access WHERE ('.$g_or.') AND '.db_string_equal_to('module_the_name',$permissions_module),NULL,NULL,false,true);
+		} else
+		{
+			$cat_access=$GLOBALS['FORUM_DB']->query('SELECT DISTINCT category_name FROM '.$GLOBALS['FORUM_DB']->get_table_prefix().'group_category_access WHERE ('.$g_or.') AND '.db_string_equal_to('module_the_name',$permissions_module).' UNION ALL SELECT DISTINCT category_name FROM '.$GLOBALS['FORUM_DB']->get_table_prefix().'member_category_access WHERE (member_id='.strval((integer)get_member()).' AND active_until>'.strval(time()).') AND '.db_string_equal_to('module_the_name',$permissions_module),NULL,NULL,false,true);
+		}
 	}
 
 	if (($only_titles) && (array_key_exists(0,$fields)) && ($fields[0]=='')) return array();
@@ -460,8 +467,6 @@ function get_search_rows($meta_type,$meta_id_field,$content,$boolean_search,$boo
 		$order='compound_rating';
 	}
 
-	$translate_join_type=(get_value('alternate_search_join_type')==='1')?'LEFT JOIN':'JOIN';
-
 	// Defined-keywords/tags search
 	if ((get_param_integer('keep_just_show_query',0)==0) && (!is_null($meta_type)) && ($content!=''))
 	{
@@ -482,18 +487,18 @@ function get_search_rows($meta_type,$meta_id_field,$content,$boolean_search,$boo
 			{
 				if (($field=='') || ($field=='!') || (strpos($select,'t1.text_original')===false)) continue;
 
-				$extra_join.=' '.$translate_join_type.' '.$db->get_table_prefix().'translate t'.strval($i).' ON t'.strval($i).'.id='.$field.' AND '.db_string_equal_to('t'.strval($i).'.language',user_lang());
+				$extra_join.=' JOIN '.$db->get_table_prefix().'translate t'.strval($i).' ON t'.strval($i).'.id='.$field.' AND '.db_string_equal_to('t'.strval($i).'.language',user_lang());
 			}
 			if (!db_has_subqueries($db->connection_read) || true /* Forced this old code to run because the "optimisation" does not work for larger result sets */)
 			{
-				$_keywords_query=$table_clause.' '.$translate_join_type.' '.$db->get_table_prefix().'seo_meta m ON ('.db_string_equal_to('m.meta_for_type',$meta_type).' AND '.$meta_join.') '.$translate_join_type.' '.$db->get_table_prefix().'translate tm ON tm.id=m.meta_keywords AND '.db_string_equal_to('tm.language',user_lang()).$extra_join;
+				$_keywords_query=$table_clause.' JOIN '.$db->get_table_prefix().'seo_meta m ON ('.db_string_equal_to('m.meta_for_type',$meta_type).' AND '.$meta_join.') JOIN '.$db->get_table_prefix().'translate tm ON tm.id=m.meta_keywords AND '.db_string_equal_to('tm.language',user_lang()).$extra_join;
 				$_keywords_query.=' WHERE '.$keywords_where;
 				$_keywords_query.=(($where_clause!='')?(' AND '.$where_clause):'');
 			} else
 			{
-				$_keywords_query=$table_clause.' '.$translate_join_type.' '.$db->get_table_prefix().'seo_meta m ON ('.db_string_equal_to('m.meta_for_type',$meta_type).' AND '.$meta_join.') '.$translate_join_type.' '.$db->get_table_prefix().'translate tm ON tm.id=m.meta_keywords AND '.db_string_equal_to('tm.language',user_lang()).$extra_join;
+				$_keywords_query=$table_clause.' JOIN '.$db->get_table_prefix().'seo_meta m ON ('.db_string_equal_to('m.meta_for_type',$meta_type).' AND '.$meta_join.') JOIN '.$db->get_table_prefix().'translate tm ON tm.id=m.meta_keywords AND '.db_string_equal_to('tm.language',user_lang()).$extra_join;
 				$_keywords_query.=' WHERE '.$keywords_where;
-				$_keywords_query.=(($where_clause!='')?(' AND tm.id IN (SELECT m.id FROM '.$table_clause.' '.$translate_join_type.' '.$db->get_table_prefix().'seo_meta m ON ('.db_string_equal_to('m.meta_for_type',$meta_type).' AND '.$meta_join.') '.$translate_join_type.' '.$db->get_table_prefix().'translate tm ON tm.id=m.meta_keywords AND '.db_string_equal_to('tm.language',user_lang()).' WHERE '.$where_clause.' AND '.$keywords_where.')'):'');
+				$_keywords_query.=(($where_clause!='')?(' AND tm.id IN (SELECT m.id FROM '.$table_clause.' JOIN '.$db->get_table_prefix().'seo_meta m ON ('.db_string_equal_to('m.meta_for_type',$meta_type).' AND '.$meta_join.') JOIN '.$db->get_table_prefix().'translate tm ON tm.id=m.meta_keywords AND '.db_string_equal_to('tm.language',user_lang()).' WHERE '.$where_clause.' AND '.$keywords_where.')'):'');
 			}
 
 			$keywords_query='SELECT '.$select.' FROM '.$_keywords_query;
@@ -524,11 +529,18 @@ function get_search_rows($meta_type,$meta_id_field,$content,$boolean_search,$boo
 			}*/
 
 			$db->dedupe_mode=true;
+
+			ocp_profile_start_for('SEARCH:t_keyword_search_rows_count');
 			$t_keyword_search_rows_count=$db->query_value_null_ok_full($_count_query_keywords_search);
-			$t_keyword_search_rows=$db->query($keywords_query,$max+$start);
-			$db->dedupe_mode=false;
+			ocp_profile_end_for('SEARCH:t_keyword_search_rows_count',$_count_query_keywords_search);
 			$t_count+=$t_keyword_search_rows_count;
+
+			ocp_profile_start_for('SEARCH:t_keyword_search_rows');
+			$t_keyword_search_rows=$db->query($keywords_query,$max+$start);
+			ocp_profile_end_for('SEARCH:t_keyword_search_rows',$keywords_query);
 			$t_rows=array_merge($t_rows,$t_keyword_search_rows);
+
+			$db->dedupe_mode=false;
 		} else $_count_query_keywords_search=NULL;
 	} else $_count_query_keywords_search=NULL;
 
@@ -546,7 +558,7 @@ function get_search_rows($meta_type,$meta_id_field,$content,$boolean_search,$boo
 			{
 				if ((strpos($select,'t'.strval($i).'.text_original')!==false) || (strpos($where_clause,'t'.strval($i).'.text_original')!==false))
 				{
-					$tc_add=' '.$translate_join_type.' '.$db->get_table_prefix().'translate t'.strval($i).' ON t'.strval($i).'.id='.$field.' AND '.db_string_equal_to('t'.strval($i).'.language',user_lang());
+					$tc_add=' JOIN '.$db->get_table_prefix().'translate t'.strval($i).' ON t'.strval($i).'.id='.$field.' AND '.db_string_equal_to('t'.strval($i).'.language',user_lang());
 					$orig_table_clause.=$tc_add;
 				}
 			}
@@ -556,7 +568,7 @@ function get_search_rows($meta_type,$meta_id_field,$content,$boolean_search,$boo
 
 				if ($field==$order) $order='t'.$i.'.text_original'; // Ah, remap to the textual equivalent then
 
-				$tc_add=' '.$translate_join_type.' '.$db->get_table_prefix().'translate t'.strval($i).' ON t'.strval($i).'.id='.$field.' AND '.db_string_equal_to('t'.strval($i).'.language',user_lang());
+				$tc_add=' JOIN '.$db->get_table_prefix().'translate t'.strval($i).' ON t'.strval($i).'.id='.$field.' AND '.db_string_equal_to('t'.strval($i).'.language',user_lang());
 				if (strpos($orig_table_clause,$tc_add)!==false) $tc_add='';
 
 				if (($only_titles) && ($i!=0)) break;
@@ -733,11 +745,18 @@ function get_search_rows($meta_type,$meta_id_field,$content,$boolean_search,$boo
 		}*/
 
 		$db->dedupe_mode=true;
+
+		ocp_profile_start_for('SEARCH:t_main_search_rows_count');
 		$t_main_search_rows_count=$db->query_value_null_ok_full($_count_query_main_search);
-		$t_main_search_rows=$db->query($query,$max+$start,NULL,false,true);
-		if ($t_main_search_rows===NULL) $t_main_search_rows=array(); // In case of a failed search query
-		$db->dedupe_mode=false;
+		ocp_profile_end_for('SEARCH:t_main_search_rows_count',$_count_query_main_search);
 		$t_count+=$t_main_search_rows_count;
+
+		ocp_profile_start_for('SEARCH:t_main_search_rows');
+		$t_main_search_rows=$db->query($query,$max+$start,NULL,false,true);
+		ocp_profile_end_for('SEARCH:t_main_search_rows',$query);
+		if ($t_main_search_rows===NULL) $t_main_search_rows=array(); // In case of a failed search query
+
+		$db->dedupe_mode=false;
 	} else
 	{
 		$t_main_search_rows=array();
