@@ -114,8 +114,8 @@ function attachments_script()
 	}
 
 	$_full=get_custom_file_base().'/'.rawurldecode($full);
-	$size=filesize($_full);
 	if (!file_exists($_full)) warn_exit(do_lang_tempcode('_MISSING_RESOURCE','url:'.escape_html($full))); // File is missing, we can't do anything
+	$size=filesize($_full);
 
 	require_code('files2');
 	check_shared_bandwidth_usage($size);
@@ -171,7 +171,7 @@ function attachments_script()
 
 	@ini_set('ocproducts.xss_detect','0');
 
-	if (ocp_srv('REQUEST_METHOD')=='HEAD') return '';
+	if (ocp_srv('REQUEST_METHOD')=='HEAD') return;
 
 	// Send actual data
 	$myfile=fopen($_full,'rb');

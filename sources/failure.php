@@ -668,12 +668,15 @@ function remove_ip_ban($ip)
 		$ip_cleaned=str_replace('*','',$ip);
 		$ip_cleaned=str_replace('..','.',$ip_cleaned);
 		$ip_cleaned=str_replace('..','.',$ip_cleaned);
-		$contents=str_replace(chr(10).'deny from '.$ip_cleaned.chr(10),chr(10),$contents);
-		$contents=str_replace(chr(13).'deny from '.$ip_cleaned.chr(13),chr(13),$contents); // Just in case
-		$myfile=fopen(get_file_base().DIRECTORY_SEPARATOR.'.htaccess','wt');
-		if (fwrite($myfile,$contents)<strlen($contents)) warn_exit(do_lang_tempcode('COULD_NOT_SAVE_FILE'));
-		fclose($myfile);
-		sync_file('.htaccess');
+		if (trim($ip_cleaned)!='')
+		{
+			$contents=str_replace(chr(10).'deny from '.$ip_cleaned.chr(10),chr(10),$contents);
+			$contents=str_replace(chr(13).'deny from '.$ip_cleaned.chr(13),chr(13),$contents); // Just in case
+			$myfile=fopen(get_file_base().DIRECTORY_SEPARATOR.'.htaccess','wt');
+			if (fwrite($myfile,$contents)<strlen($contents)) warn_exit(do_lang_tempcode('COULD_NOT_SAVE_FILE'));
+			fclose($myfile);
+			sync_file('.htaccess');
+		}
 	}
 	$GLOBALS['SITE_DB']->query_delete('hackattack',array('ip'=>$ip));
 }
@@ -1163,7 +1166,10 @@ function _access_denied($class,$param,$force_login)
 
 	if (($GLOBALS['IS_ACTUALLY_ADMIN']) && (get_param_integer('keep_fatalistic',0)==1)) fatal_exit($message);
 
-	if (((is_guest()) && ($GLOBALS['NON_PAGE_SCRIPT']==0)) || ($force_login))
+	if (((is_guest()) && ((running_script('attachment')) || (running_script('dload')) || ($GLOBALS['NON_PAGE_SCRIPT']==0))) || ($force_login))
+	// We do want to supply a nice login screen for attachment/dload scripts because they are sometimes externally linked to (e.g. in emails or hotlinks)
+	// Otherwise we want flat access denied due to a flat request/response model
+	// NB: Also see similar running_script lines in globalise function
 	{
 		if (get_param_integer('save_and_stay',0)==1)
 		{

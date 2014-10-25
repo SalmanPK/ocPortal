@@ -293,7 +293,8 @@ function initialise_error_mechanism()
 			{
 				window.done_one_error=true;
 				var alert='{!JAVASCRIPT_ERROR;^}\n\n'+code+': '+msg+'\n'+file;
-				window.fauxmodal_alert(alert,null,'{!ERROR_OCCURRED;^}');
+				if (window.document.body) // i.e. if loaded
+					window.fauxmodal_alert(alert,null,'{!ERROR_OCCURRED;^}');
 			}
 			return false;
 		};
@@ -2386,9 +2387,13 @@ function inner_html_load(xml_string) {
 	var xml;
 	if (typeof DOMParser!='undefined')
 	{
-		xml=(new DOMParser()).parseFromString(xml_string,"application/xml");
+		try
+		{
+			xml=(new DOMParser()).parseFromString(xml_string,"application/xml");
+		}
+		catch (e) { xml=null; };
 
-		if ((typeof xml.documentElement!='undefined') && (typeof xml.documentElement.childNodes[0]!='undefined') && (xml.documentElement.childNodes[0].nodeName=='parsererror')) // HTML method then
+		if ((xml===null) || ((typeof xml.documentElement!='undefined') && (typeof xml.documentElement.childNodes[0]!='undefined') && (xml.documentElement.childNodes[0].nodeName=='parsererror'))) // HTML method then
 		{
 			xml=document.implementation.createHTMLDocument('');
 			var doc_elt=xml.documentElement;

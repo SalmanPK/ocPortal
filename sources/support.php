@@ -631,7 +631,7 @@ function globalise($middle,$message=NULL,$type='',$include_header_and_footer=fal
 
 	global $CYCLES; $CYCLES=array(); // Here we reset some Tempcode environmental stuff, because template compilation or preprocessing may have dirtied things
 
-	if (!running_script('index'))
+	if (!running_script('dload') && !running_script('attachment') && !running_script('index'))
 	{
 		global $ATTACHED_MESSAGES;
 		$middle->handle_symbol_preprocessing();
@@ -1763,9 +1763,12 @@ function get_bot_type()
 	$agent=ocp_srv('HTTP_USER_AGENT');
 	if (strpos($agent,'WebKit')!==false || strpos($agent,'Trident')!==false || strpos($agent,'MSIE')!==false || strpos($agent,'Firefox')!==false || strpos($agent,'Opera')!==false)
 	{
-		// Quick exit path
-		$CACHE_BOT_TYPE=NULL;
-		return NULL;
+		if (strpos($agent,'bot')===false)
+		{
+			// Quick exit path
+			$CACHE_BOT_TYPE=NULL;
+			return NULL;
+		}
 	}
 	$agent=strtolower($agent);
 
@@ -2235,6 +2238,9 @@ function propagate_ocselect_pagelink()
  */
 function member_personal_links_and_details($member_id)
 {
+	static $cache=array();
+	if (isset($cache[$member_id])) return $cache[$member_id];
+
 	$details=new ocp_tempcode();
 	$links=new ocp_tempcode();
 
@@ -2372,7 +2378,8 @@ function member_personal_links_and_details($member_id)
 		$num_unread_pps=0;
 	}
 
-	return array($links,$details,$num_unread_pps);
+	$cache[$member_id]=array($links,$details,$num_unread_pps);
+	return $cache[$member_id];
 }
 
 /**

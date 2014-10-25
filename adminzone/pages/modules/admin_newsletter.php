@@ -596,7 +596,7 @@ class Module_admin_newsletter extends standard_aed_module
 			header('Content-type: text/csv');
 			header('Content-Disposition: attachment; filename="'.str_replace(chr(13),'',str_replace(chr(10),'',addslashes($filename))).'"');
 
-			if (ocp_srv('REQUEST_METHOD')=='HEAD') return '';
+			if (ocp_srv('REQUEST_METHOD')=='HEAD') exit();
 
 			@ini_set('ocproducts.xss_detect','0');
 		}
@@ -1118,15 +1118,15 @@ class Module_admin_newsletter extends standard_aed_module
 				$_existing=get_translated_text($myrow['news_article'],NULL,$lang);
 				if ($_existing=='') $_existing=get_translated_text($myrow['news'],NULL,$lang);
 			}
-			$existing=do_template('NEWSLETTER_DEFAULT_FCOMCODE',array('_GUID'=>'53c02947915806e519fe14c318813f42','CONTENT'=>$_existing,'LANG'=>$lang));
+			$existing=do_template('NEWSLETTER_DEFAULT_FCOMCODE',array('_GUID'=>'53c02947915806e519fe14c318813f42','CONTENT'=>$_existing,'LANG'=>$lang,'SUBJECT'=>$default_subject));
 		} else
 		{
-			$default=do_template('NEWSLETTER_DEFAULT_FCOMCODE',array('_GUID'=>'53c02947915806e519fe14c318813f44','CONTENT'=>$_existing,'LANG'=>$lang));
+			$default=do_template('NEWSLETTER_DEFAULT_FCOMCODE',array('_GUID'=>'53c02947915806e519fe14c318813f44','CONTENT'=>$_existing,'LANG'=>$lang,'SUBJECT'=>$default_subject));
 			if (strpos($default->evaluate(),'<html')!==false && strpos($_existing,'<html')===false) // Our template contains HTML, so we need to pull in that HTML to the edit field (it's a full design email, not a simple encapsulation)
 			{
 				if ($comcode_given)
 				{
-					$default=do_template('NEWSLETTER_DEFAULT_FCOMCODE',array('_GUID'=>'53c02947915806e519fe14c318813f46','CONTENT'=>comcode_to_tempcode($_existing),'LANG'=>$lang));
+					$default=do_template('NEWSLETTER_DEFAULT_FCOMCODE',array('_GUID'=>'53c02947915806e519fe14c318813f46','CONTENT'=>comcode_to_tempcode($_existing),'LANG'=>$lang,'SUBJECT'=>$default_subject));
 				}
 				$existing=$default;
 			} else

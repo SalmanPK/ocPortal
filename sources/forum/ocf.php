@@ -1337,14 +1337,14 @@ class forum_driver_ocf extends forum_driver_base
 			$test=ocf_is_on_ldap($username);
 			if (!$test)
 			{
-				$out['error']=(do_lang_tempcode('_USER_NO_EXIST',escape_html($username)));
+				$out['error']=is_null($username)?do_lang_tempcode('USER_NO_EXIST'):do_lang_tempcode('_USER_NO_EXIST',escape_html($username));
 				return $out;
 			}
 
 			$test_auth=ocf_ldap_authorise_login($username,$password_raw);
 			if ($test_auth['m_pass_hash_salted']=='!!!')
 			{
-				$out['error']=(do_lang_tempcode('USER_BAD_PASSWORD'));
+				$out['error']=do_lang_tempcode('USER_BAD_PASSWORD');
 				return $out;
 			}
 
@@ -1371,7 +1371,7 @@ class forum_driver_ocf extends forum_driver_base
 
 		if ((!array_key_exists(0,$rows)) || ($rows[0]===NULL)) // All hands to lifeboats
 		{
-			$out['error']=(do_lang_tempcode('_USER_NO_EXIST',escape_html($username)));
+			$out['error']=is_null($username)?do_lang_tempcode('USER_NO_EXIST'):do_lang_tempcode('_USER_NO_EXIST',escape_html($username));
 			return $out;
 		}
 		$row=$rows[0];
@@ -1384,7 +1384,7 @@ class forum_driver_ocf extends forum_driver_base
 			// Doesn't exist any more? This is a special case - the 'LDAP member' exists in our DB, but not LDAP. It has been deleted from LDAP or LDAP server has jumped
 			/*if (is_null($rows[0]['m_pass_hash_salted']))
 			{
-				$out['error']=(do_lang_tempcode('_USER_NO_EXIST',$username));
+				$out['error']=do_lang_tempcode('_USER_NO_EXIST',$username);
 				return $out;
 			} No longer appropriate with new authentication mode - instead we just have to give an invalid password message  */
 
@@ -1395,18 +1395,18 @@ class forum_driver_ocf extends forum_driver_base
 		{
 			if ($row['m_validated']==0)
 			{
-				$out['error']=(do_lang_tempcode('USER_NOT_VALIDATED_STAFF'));
+				$out['error']=do_lang_tempcode('USER_NOT_VALIDATED_STAFF');
 				return $out;
 			}
 		}
 		if ($row['m_validated_email_confirm_code']!='')
 		{
-			$out['error']=(do_lang_tempcode('USER_NOT_VALIDATED_EMAIL'));
+			$out['error']=do_lang_tempcode('USER_NOT_VALIDATED_EMAIL');
 			return $out;
 		}
 		if ($this->is_banned($row['id'])) // All hands to the guns
 		{
-			$out['error']=(do_lang_tempcode('USER_BANNED'));
+			$out['error']=do_lang_tempcode('USER_BANNED');
 			return $out;
 		}
 
@@ -1424,14 +1424,14 @@ class forum_driver_ocf extends forum_driver_base
 						if ($password_hashed!=$row['m_pass_hash_salted'])
 						{
 							require_code('tempcode'); // This can be incidental even in fast AJAX scripts, if an old invalid cookie is present, so we need tempcode for do_lang_tempcode
-							$out['error']=(do_lang_tempcode('USER_BAD_PASSWORD'));
+							$out['error']=do_lang_tempcode('USER_BAD_PASSWORD');
 							return $out;
 						}
 					} else
 					{
 						if (md5($row['m_pass_salt'].$password_hashed)!=$row['m_pass_hash_salted'])
 						{
-							$out['error']=(do_lang_tempcode('USER_BAD_PASSWORD'));
+							$out['error']=do_lang_tempcode('USER_BAD_PASSWORD');
 							return $out;
 						}
 					}
@@ -1439,14 +1439,14 @@ class forum_driver_ocf extends forum_driver_base
 				case 'plain':
 					if ($password_hashed!=md5($row['m_pass_hash_salted']))
 					{
-						$out['error']=(do_lang_tempcode('USER_BAD_PASSWORD'));
+						$out['error']=do_lang_tempcode('USER_BAD_PASSWORD');
 						return $out;
 					}
 					break;
 				case 'md5': // Old style plain md5		(also works if both are unhashed: used for LDAP)
 					if (($password_hashed!=$row['m_pass_hash_salted']) && ($password_hashed!='!!!')) // The !!! bit would never be in a hash, but for plain text checks using this same code, we sometimes use '!!!' to mean 'Error'.
 					{
-						$out['error']=(do_lang_tempcode('USER_BAD_PASSWORD'));
+						$out['error']=do_lang_tempcode('USER_BAD_PASSWORD');
 						return $out;
 					}
 					break;
@@ -1456,7 +1456,7 @@ class forum_driver_ocf extends forum_driver_base
 				case 'ldap':
 					if ($password_hashed!=$row['m_pass_hash_salted'])
 					{
-						$out['error']=(do_lang_tempcode('USER_BAD_PASSWORD'));
+						$out['error']=do_lang_tempcode('USER_BAD_PASSWORD');
 						return $out;
 					}
 					break;
@@ -1465,7 +1465,7 @@ class forum_driver_ocf extends forum_driver_base
 					if (!file_exists($path)) $path=get_file_base().'/sources/hooks/systems/ocf_auth/'.$password_compatibility_scheme.'.php';
 					if (!file_exists($path))
 					{
-						$out['error']=(do_lang_tempcode('UNKNOWN_AUTH_SCHEME_IN_DB'));
+						$out['error']=do_lang_tempcode('UNKNOWN_AUTH_SCHEME_IN_DB');
 						return $out;
 					}
 					require_code('hooks/systems/ocf_auth/'.$password_compatibility_scheme);

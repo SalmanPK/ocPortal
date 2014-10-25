@@ -340,7 +340,7 @@ class Module_admin_config
 
 			// Security/Usergroup Options
 			//  Uploading
-				add_config_option('FILE_TYPES','valid_types','line','return \'swf,sql,odg,odp,odt,ods,pdf,pgp,dot,doc,ppt,csv,xls,docx,pptx,xlsx,pub,txt,log,psd,tga,tif,gif,png,ico,bmp,jpg,jpeg,flv,avi,mov,3gp,mpg,mpeg,mp4,f4v,webm,asf,wmv,zip,tar,rar,gz,wav,mp3,ogg,ogv,torrent,php,css,tpl,ini,eml,patch,diff,iso,dmg\';','SECURITY','UPLOADED_FILES'); // fla,html,htm,svg,xml kept out for security reasons. NB: Can't add any more due to length limit.
+				add_config_option('FILE_TYPES','valid_types','line','return \'swf,sql,odg,odp,odt,ods,pdf,pgp,dot,doc,ppt,csv,xls,docx,pptx,xlsx,pub,txt,log,psd,tga,tif,gif,png,ico,bmp,jpg,jpeg,flv,avi,mov,3gp,mpg,mpeg,mp4,f4v,m4v,webm,asf,wmv,zip,tar,rar,gz,wav,mp3,ogg,ogv,torrent,php,css,tpl,ini,eml,patch,diff,iso,dmg\';','SECURITY','UPLOADED_FILES'); // fla,html,htm,svg,xml kept out for security reasons. NB: Can't add any more due to length limit.
 				add_config_option('IMAGE_TYPES','valid_images','line','return \'jpg,jpeg,gif,png,ico\';','SECURITY','UPLOADED_FILES');
 
 			// Feature Options
@@ -837,7 +837,7 @@ class Module_admin_config
 			warn_exit(do_lang_tempcode('INTERNAL_ERROR'));
 
 		// Make sure we haven't locked ourselves out due to clean URL support
-		if ((post_param_integer('mod_rewrite',0)==1) && (get_option('mod_rewrite')=='0') && (substr(ocp_srv('SERVER_SOFTWARE'),0,6)=='Apache') && ((!file_exists(get_file_base().DIRECTORY_SEPARATOR.'.htaccess')) || (strpos(file_get_contents(get_file_base().DIRECTORY_SEPARATOR.'.htaccess'),'RewriteEngine on')===false) || (http_download_file(get_base_url().'/sitemap.htm',NULL,false,true)!='')))
+		if ((post_param_integer('mod_rewrite',0)==1) && (get_option('mod_rewrite')=='0') && (substr(ocp_srv('SERVER_SOFTWARE'),0,6)=='Apache') && ((!file_exists(get_file_base().DIRECTORY_SEPARATOR.'.htaccess')) || (strpos(file_get_contents(get_file_base().DIRECTORY_SEPARATOR.'.htaccess'),'RewriteEngine on')===false) || (http_download_file(get_base_url().'/sitemap.htm',NULL,false,true)!='') && ($GLOBALS['HTTP_MESSAGE']=='404')))
 		{
 			warn_exit(do_lang_tempcode('BEFORE_MOD_REWRITE'));
 		}

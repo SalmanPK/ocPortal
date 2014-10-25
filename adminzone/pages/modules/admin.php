@@ -142,6 +142,7 @@ class Module_admin
 			array('license','licence'),
 			array('atom','rss','feed'),
 			array('login','logon','log-in','log-on'),
+			array('redirect','move'),
 			array('gallery','album'),
 			array('audit','log','usage'),
 			array('download','file','document'),
@@ -165,7 +166,7 @@ class Module_admin
 			array('subscribe','track','notification','alert','monitor','watch'),
 			array('bbcode','wikicode','comcode','shortcode'),
 			array('html','xhtml'),
-			array('addon','add-on','mod','hack','extension','plugin'),
+			array('addon','add-on','mod','hack','extension','plugin','module','system'),
 			array('cedi','wiki','seedy'),
 			array('name','title'),
 			array('analytics','statistics','hits'),
@@ -179,7 +180,7 @@ class Module_admin
 			array('news','story','stories','article'),
 			array('language','unicode','utf','utf8','utf-8','character','charset','24','clock','timezone','time-zone','time','date','translate'),
 			array('ldap','active directory'),
-			array('contact','feedback','ticket','message','issue'),
+			array('contact','contactmember'/*TODO: remove in v10*/,'feedback','ticket','message','issue','email','e-mail'),
 			array('documentation','help','guide'),
 			array('sef','short','friendly'),
 			array('survey','quiz','competition','test'),
@@ -192,7 +193,6 @@ class Module_admin
 			array('logout','log-out','sign-out','sign-off'),
 			array('login','log-in','sign-in','sign-on'),
 			array('shopping','ecommerce','payment','purchase'),
-			array('module','addon','system'),
 			array('cache','decache','cleanup'),
 			array('ssl','https'),
 			array('seed','theme wizard'),
@@ -530,6 +530,15 @@ class Module_admin
 							}
 						}
 					}
+
+					$n=do_lang('MODULE_TRANS_NAME_'.$page,NULL,NULL,NULL,NULL,false);
+					if (($this->_keyword_match($n)) && (has_actual_page_access(get_member(),$page,$zone)))
+					{
+						$_url=build_url(array('page'=>$page),$zone);
+						$site_tree_editor_url=build_url(array('page'=>'admin_sitetree','type'=>'site_tree','id'=>$zone.':'.$page),'adminzone');
+						$permission_tree_editor_url=build_url(array('page'=>'admin_permissions','id'=>$zone.':'.$page),'adminzone');
+						$content[$current_results_type]->attach(do_template('INDEX_SCREEN_FANCIER_ENTRY',array('NAME'=>$n,'URL'=>$_url,'TITLE'=>'','DESCRIPTION'=>do_lang_tempcode('FIND_IN_SITE_TREE_EDITOR',escape_html($site_tree_editor_url->evaluate()),escape_html($permission_tree_editor_url->evaluate())))));
+					}
 				}
 			}
 		}
@@ -690,7 +699,7 @@ class Module_admin
 			$all_groups=$GLOBALS['FORUM_DB']->query_select('f_groups',array('id','g_name'),$map);
 			foreach ($all_groups as $p)
 			{
-				$n=get_translated_text($p['g_name']);
+				$n=get_translated_text($p['g_name'],$GLOBALS['FORUM_DB']);
 				if ($this->_keyword_match($n))
 				{
 					$_url=build_url(array('page'=>'admin_ocf_groups','type'=>'_ed','id'=>$p['id']),'adminzone');
@@ -775,6 +784,43 @@ class Module_admin
 					$url='';
 					$content[$current_results_type]->attach(do_template('INDEX_SCREEN_FANCIER_ENTRY',array('_GUID'=>'1368be933d0ccbcd65939f29dd6d7003','NAME'=>$p,'URL'=>$url,'TITLE'=>'','DESCRIPTION'=>escape_html($t))));
 				}
+			}
+		}
+
+		// Non-installed addons
+		$current_results_type=do_lang('ADDONS');
+		if ($this->_section_match($section_limitations,$current_results_type))
+		{
+			$content[$current_results_type]=new ocp_tempcode();
+			$map=array();
+			$dh=@opendir(get_custom_file_base().'/imports/addons');
+			if ($dh!==false)
+			{
+				while (($f=readdir($dh))!==false)
+				{
+					if (substr($f,-4)=='.tar')
+					{
+						$p=basename($f,'.tar');
+						if ($this->_keyword_match($p))
+						{
+							require_code('tar');
+							$tar=tar_open(get_custom_file_base().'/imports/addons/'.$f,'rb');
+							$directory=tar_get_directory($tar);
+							$info_file=tar_get_file($tar,'mod.inf'); // TODO: Change in v10
+							if (!is_null($info_file))
+							{
+								$info=better_parse_ini_file(NULL,$info_file['data']);
+
+								$title=isset($info['title'])?$info['title']:'';
+								$description=isset($info['description'])?$info['description']:'';
+								$_url=build_url(array('page'=>'admin_addons'),'adminzone');
+								$url=$_url->evaluate();
+								$content[$current_results_type]->attach(do_template('INDEX_SCREEN_FANCIER_ENTRY',array('NAME'=>$p,'URL'=>$url,'TITLE'=>$title,'DESCRIPTION'=>$description)));
+							}
+						}
+					}
+				}
+				closedir($dh);
 			}
 		}
 

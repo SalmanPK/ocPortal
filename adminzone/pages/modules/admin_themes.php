@@ -1360,6 +1360,11 @@ class Module_admin_themes
 					$url=get_custom_base_url().'/themes/'.str_replace('default/',$theme.'/',str_replace('templates/','templates_custom/',$file)).'.'.strval($time);
 					$old_file=get_custom_file_base().'/themes/'.str_replace('default/',$theme.'/',str_replace('templates/','templates_custom/',$file)).'.'.strval($time);
 				}
+				if (!file_exists($old_file)) // Maybe have a revision in the default theme rather than the custom theme
+				{
+					$url=get_custom_base_url().'/themes/'.str_replace($theme.'/','default/',str_replace('templates/','templates_custom/',$file)).'.'.strval($time);
+					$old_file=get_custom_file_base().'/themes/'.str_replace($theme.'/','default/',str_replace('templates/','templates_custom/',$file)).'.'.strval($time);
+				}
 				$size=filesize($old_file);
 				$restore_url=build_url(array('page'=>'_SELF','type'=>'_edit_templates','theme'=>$theme,'f0file'=>basename($file),'restore_from'=>substr($old_file,strlen(get_custom_file_base().'/themes/'))),'_SELF');
 				require_code('diff');
@@ -1912,6 +1917,7 @@ class Module_admin_themes
 
 		$unmodified=(strpos($path,'themes/default/images/')!==false);
 
+		disable_php_memory_limit();
 		$from_file=@file_get_contents(($unmodified?get_file_base():get_custom_file_base()).'/'.rawurldecode($path));
 		$width=do_lang_tempcode('UNKNOWN_EM');
 		$height=do_lang_tempcode('UNKNOWN_EM');
