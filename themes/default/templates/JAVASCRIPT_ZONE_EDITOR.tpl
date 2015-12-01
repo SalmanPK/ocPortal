@@ -172,13 +172,13 @@ function reload_preview(id)
 	var edit_element=document.getElementById('edit_'+id+'_textarea');
 	if (!edit_element) return; // Nothing interatively edited
 
-	set_inner_html(element,'<div aria-busy="true" class="ajax_tree_list_loading vertical_alignment"><img src="'+'{$IMG;,loading}'.replace(/^http:/,window.location.protocol)+'" /> <span>{!LOADING;^}</span></div>');
+	set_inner_html(element,'<div aria-busy="true" class="ajax_tree_list_loading vertical_alignment"><img src="'+'{$IMG;,loading}'.replace(/^https?:/,window.location.protocol)+'" /> <span>{!LOADING;^}</span></div>');
 
 	window.loading_preview_of=id;
 
 	var data='';
 	data+=get_textbox(edit_element);
-	do_ajax_request('{$FIND_SCRIPT_NOHTTP;,comcode_convert}?fix_bad_html=1&css=1&javascript=1&from_html=0&is_semihtml='+(is_wysiwyg_field(edit_element)?'1':'0')+'&panel='+(((id=='panel_left') || (id=='panel_right'))?'1':'0')+keep_stub(),reloaded_preview,(is_wysiwyg_field(edit_element)?'data__is_wysiwyg=1&':'')+'data='+window.encodeURIComponent(data));
+	do_ajax_request('{$FIND_SCRIPT_NOHTTP;,comcode_convert}?fix_bad_html=1&css=1&javascript=1&is_semihtml='+(is_wysiwyg_field(edit_element)?'1':'0')+'&panel='+(((id=='panel_left') || (id=='panel_right'))?'1':'0')+keep_stub(),reloaded_preview,'data='+window.encodeURIComponent(data));
 }
 
 function reloaded_preview(ajax_result_frame,ajax_result)

@@ -229,7 +229,7 @@ class Module_cms_catalogues extends standard_aed_module
 			$name=$entry_fields[0]['effective_value']; // 'Name' is value of first field
 
 			$fr=array();
-			$fr[]=protect_from_escaping(hyperlink(build_url(array('page'=>'catalogues','type'=>'entry','id'=>$row['id']),get_module_zone('catalogues')),$name));
+			$fr[]=protect_from_escaping(hyperlink(build_url(array('page'=>'catalogues','type'=>'entry','id'=>$row['id']),get_module_zone('catalogues')),$name,false,true));
 			if (array_key_exists($row['cc_id'],$cat_titles))
 			{
 				$cc_title=$cat_titles[$row['cc_id']];
@@ -896,7 +896,7 @@ class Module_cms_catalogues extends standard_aed_module
 		}
 
 		// Open CSV file
-		@ini_set('auto_detect_line_endings','1');
+		safe_ini_set('auto_detect_line_endings','1');
 		$handle=fopen($csv_name,'rt');
 
 		// Read column names
@@ -1244,12 +1244,12 @@ class Module_cms_catalogues extends standard_aed_module
 
 		if (function_exists('set_time_limit')) @set_time_limit(0);
 
-		header('Content-type: text/csv');
+		header('Content-type: text/csv; charset='.get_charset());
 		header('Content-Disposition: attachment; filename="'.str_replace(chr(13),'',str_replace(chr(10),'',addslashes($filename))).'"');
 
 		if (ocp_srv('REQUEST_METHOD')=='HEAD') exit();
 
-		@ini_set('ocproducts.xss_detect','0');
+		safe_ini_set('ocproducts.xss_detect','0');
 
 		$catalogue_row=$GLOBALS['SITE_DB']->query_select('catalogues',array('*'),array('c_name'=>$catalogue_name),'',NULL,NULL,true);
 		if (is_null($catalogue_row)) $catalogue_row=array();
@@ -1377,7 +1377,7 @@ class Module_cms_catalogues_cat extends standard_aed_module
 			$edit_link=build_url($url_map+array('id'=>$row['id']),'_SELF');
 
 			$fr=array();
-			$fr[]=protect_from_escaping(hyperlink(build_url(array('page'=>'catalogues','type'=>'category','id'=>$row['id']),get_module_zone('catalogues')),get_translated_text($row['cc_title'])));
+			$fr[]=protect_from_escaping(hyperlink(build_url(array('page'=>'catalogues','type'=>'category','id'=>$row['id']),get_module_zone('catalogues')),get_translated_text($row['cc_title']),false,true));
 			$fr[]=get_timezoned_date($row['cc_add_date']);
 			$fr[]=protect_from_escaping(hyperlink($edit_link,do_lang_tempcode('EDIT'),false,true,'#'.strval($row['id'])));
 
@@ -1543,7 +1543,7 @@ class Module_cms_catalogues_cat extends standard_aed_module
 		if ($parent_id==-1) $parent_id=NULL;
 		$urls=get_url('image_url','rep_image','uploads/grepimages',0,OCP_UPLOAD_IMAGE);
 		$rep_image=$urls[0];
-		if (($rep_image!='') && (function_exists('imagecreatefromstring')) && (get_value('resize_rep_images')!=='0'))
+		if (($rep_image!='') && (function_exists('imagepng')) && (get_value('resize_rep_images')!=='0'))
 			convert_image(get_custom_base_url().'/'.$rep_image,get_custom_file_base().'/uploads/grepimages/'.basename(rawurldecode($rep_image)),-1,-1,intval(get_option('thumb_width')),true,NULL,false,true);
 
 		$move_days_lower=post_param_integer('move_days_lower',30);
@@ -1599,7 +1599,7 @@ class Module_cms_catalogues_cat extends standard_aed_module
 		{
 			$urls=get_url('image_url','rep_image','uploads/grepimages',0,OCP_UPLOAD_IMAGE);
 			$rep_image=$urls[0];
-			if (($rep_image!='') && (function_exists('imagecreatefromstring')) && (get_value('resize_rep_images')!=='0'))
+			if (($rep_image!='') && (function_exists('imagepng')) && (get_value('resize_rep_images')!=='0'))
 				convert_image(get_custom_base_url().'/'.$rep_image,get_custom_file_base().'/uploads/grepimages/'.basename(rawurldecode($rep_image)),-1,-1,intval(get_option('thumb_width')),true,NULL,false,true);
 			if (($rep_image=='') && (post_param_integer('rep_image_unlink',0)!=1)) $rep_image=NULL;
 		} else $rep_image=STRING_MAGIC_NULL;
@@ -1624,10 +1624,10 @@ class Module_cms_catalogues_cat extends standard_aed_module
 	{
 		require_code('catalogues2');
 
-		actual_delete_catalogue_category(intval($id));
-
 		$catalogue_name=$GLOBALS['SITE_DB']->query_value_null_ok('catalogue_categories','c_name',array('id'=>$id));
 		if (is_null($catalogue_name)) warn_exit(do_lang_tempcode('MISSING_RESOURCE'));
+
+		actual_delete_catalogue_category(intval($id));
 
 		$this->donext_catalogue_name=$catalogue_name;
 	}
@@ -1693,7 +1693,7 @@ class Module_cms_catalogues_alt extends standard_aed_module
 	var $is_tree_catalogue=false; // Set for usage by do-next-manager
 	var $menu_label='CATALOGUES';
 	var $table='catalogue_entries';
-	var $javascript="var fn=document.getElementById('title'); if (fn) { var form=fn.form; fn.onchange=function() { if ((form.elements['name']) && (form.elements['name'].value=='')) form.elements['name'].value=fn.value.toLowerCase().replace(/[^\w\d\.\-]/g,'_').replace(/\_+\$/,''); }; }";
+	var $javascript="var fn=document.getElementById('title'); if (fn) { var form=fn.form; fn.onchange=function() { if ((form.elements['name']) && (form.elements['name'].value=='')) form.elements['name'].value=fn.value.toLowerCase().replace(/[^\w\d\.\-]/g,'_').replace(/\_+\$/,'').substr(0,80); }; }";
 
 	/**
 	 * Standard aed_module list function.

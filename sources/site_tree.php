@@ -212,9 +212,9 @@ function site_tree_script()
 
 	$default=get_param('default',NULL,true);
 
-	header('Content-Type: text/xml');
+	header('Content-Type: text/xml; charset='.get_charset());
 	$permissions_needed=(get_param_integer('get_perms',0)==1); // Whether we are limiting our tree to permission-supporting
-	@ini_set('ocproducts.xss_detect','0');
+	safe_ini_set('ocproducts.xss_detect','0');
 
 	echo '<'.'?xml version="1.0" encoding="'.get_charset().'"?'.'>';
 	echo '<request><result>';
@@ -298,9 +298,9 @@ function site_tree_script()
 					if (preg_match('#@package\s+(\w+)#',file_get_contents(zone_black_magic_filterer(get_file_base().'/'.$zone.'/pages/'.$page_type.'/'.$page.'.php')),$matches)!=0)
 					{
 						$package=$matches[1];
-						$path=get_file_base().'/sources/hooks/systems/addon_registry/'.$package.'.php';
+						$path=get_file_base().'/sources_custom/hooks/systems/addon_registry/'.$package.'.php';
 						if (!file_exists($path))
-							$path=get_file_base().'/sources_custom/hooks/systems/addon_registry/'.$package.'.php';
+							$path=get_file_base().'/sources/hooks/systems/addon_registry/'.$package.'.php';
 						if (file_exists($path))
 						{
 							require_lang('zones');

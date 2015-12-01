@@ -18,14 +18,14 @@
 			<div class="accessibility_hidden"><label for="tree_list">{!ENTRY}</label></div>
 			<form title="{!PRIMARY_PAGE_FORM}" action="index.php" method="post">
 				<input onchange="update_details_box(this)" style="display: none" type="text" id="tree_list" name="tree_list" value="{$_GET*,id}" />
-				<div id="tree_list__root_tree_list">
+				<div id="tree_list__root_tree_list" class="sitemap_editor">
 					<!-- List put in here -->
 				</div>
 			</form>
 			<script type="text/javascript">// <![CDATA[
-				var site_tree=new tree_list('tree_list','data/site_tree.php?start_links=1&get_perms=0{$KEEP;}','','',false,null,true);
+				var site_tree=new tree_list('tree_list','data/site_tree.php?start_links=1&get_perms=0{$KEEP;/}','','',false,null,true);
 
-				var actions_tpl='{!ACTIONS;}:<ul role="navigation" class="actions_list">[1]<\/ul>';
+				var actions_tpl='{!ACTIONS;/}:<ul role="navigation" class="actions_list">[1]<\/ul>';
 				var actions_tpl_item='<li><a href="[2]">[1]<\/a><\/li>';
 
 				var info_tpl='<div class="wide_table_wrap"><table class="results_table wide_table autosized_table" summary="{!MAP_TABLE;}"><tbody>[1]<\/tbody><\/table><\/div>';

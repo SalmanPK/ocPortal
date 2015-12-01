@@ -12,6 +12,8 @@
 
 */
 
+/*EXTRA FUNCTIONS: shell_exec*/
+
 /**
  * @license		http://opensource.org/licenses/cpal_1.0 Common Public Attribution License
  * @copyright	ocProducts Ltd
@@ -91,10 +93,43 @@ class Module_admin_phpinfo
 		$out=preg_replace('#<head[^>]*>.*</head[^>]*>#s','',$out);
 
 		$out=str_replace(' width="600"',' width="100%"',$out);
-		$out=preg_replace('#([^\s<>"\']{65}&[^;]+;)#','${1}<br />',$out);
-		$out=preg_replace('#([^\s<>"\']{95})#','${1}<br />',$out);
+		//$out=preg_replace('#([^\s<>"\']{65}&[^;]+;)#','${1}<br />',$out);
+		//$out=preg_replace('#([^\s<>"\']{95})#','${1}<br />',$out);
 		$url_parts=parse_url(get_base_url());
 		$out=str_replace('<img border="0" src="/','<img border="0" style="padding-top: 20px" src="http://'.escape_html($url_parts['host']).'/',$out);
+
+		$out.='<h2>Run-time details</h2>';
+		$out.='<p>Your IP address: '.escape_html(get_ip_address()).'</p>';
+		if ((function_exists('posix_getpwuid')) && (strpos(@ini_get('disable_functions'),'posix_getpwuid')===false))
+		{
+			$user=posix_getuid();
+			$suexec=($user==fileowner(get_file_base().'/index.php'));
+			$dets=posix_getpwuid($user);
+			$out.='<p>Running as user: '.escape_html($dets['name']).' ('.($suexec?'suEXEC or similar':'Not suEXEC').')</p>';
+		}
+		elseif (strpos(@ini_get('disable_functions'),'shell_exec')===false)
+		{
+			$test=@shell_exec('whoami');
+			if (!empty($test))
+			{
+				if (strpos(@ini_get('disable_functions'),'get_current_user')===false)
+				{
+					$suexec=($test==get_current_user());
+				} else
+				{
+					$suexec=NULL;
+				}
+				$out.='<p>Running as user: '.escape_html($test).(is_null($suexec)?'':(' ('.($suexec?'suEXEC or similar':'Not suEXEC').')')).'</p>';
+			}
+		} else
+		{
+			$tmp=ocp_tempnam('');
+			$user=@fileowner($tmp);
+			@unlink($tmp);
+			$suexec=($user==fileowner(get_file_base().'/index.php'));
+			$out.='<p>Running as user: '.escape_html(($suexec && (strpos(@ini_get('disable_functions'),'get_current_user')===false))?get_current_user():('#'.strval($user))).' ('.($suexec?'suEXEC or similar':'Not suEXEC').')</p>';
+		}
+		$out.='<p>PHP configured as: '.escape_html(php_sapi_name()).'</p>';
 
 		require_css('phpinfo');
 

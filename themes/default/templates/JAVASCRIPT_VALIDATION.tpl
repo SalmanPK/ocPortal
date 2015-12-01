@@ -2,7 +2,7 @@
 
 "use strict";
 
-new Image().src='{$IMG;,loading}'.replace(/^http:/,window.location.protocol);
+new Image().src='{$IMG;,loading}'.replace(/^https?:/,window.location.protocol);
 
 function password_strength(ob)
 {
@@ -80,7 +80,7 @@ function set_field_error(the_element,error_msg)
 						p=p.parentNode;
 						if ((error_msg.substr(0,5)!='{!DISABLED_FORM_FIELD;}'.substr(0,5)) && (p) && (typeof p.getAttribute!='undefined') && (p.getAttribute('id')) && (p.getAttribute('id').substr(0,2)=='g_') && (p.style.display=='none'))
 						{
-							select_tab('g',p.getAttribute('id').substr(2,p.id.length-2));
+							select_tab('g',p.getAttribute('id').substr(2,p.id.length-2),true);
 							break;
 						}
 					}
@@ -246,6 +246,14 @@ function disable_buttons_just_clicked(inputs)
 
 function do_form_preview(event,form,preview_url,has_separate_preview)
 {
+	if (typeof has_separate_preview=='undefined') has_separate_preview=false;
+
+	if (!document.getElementById('preview_iframe'))
+	{
+		fauxmodal_alert('{!ADBLOCKER;}');
+		return false;
+	}
+
 	preview_url+=((typeof window.mobile_version_for_preview=='undefined')?'':('&keep_mobile='+(window.mobile_version_for_preview?'1':'0')));
 
 	var old_action=form.getAttribute('action');
@@ -261,11 +269,11 @@ function do_form_preview(event,form,preview_url,has_separate_preview)
 
 	if (form.onsubmit)
 	{
-		var test=form.onsubmit.call(form,event);
+		var test=form.onsubmit.call(form,event,true);
 		if (!test) return false;
 	} 
 
-	if ((has_separate_preview) || (window.has_separate_preview))
+	if ((has_separate_preview) || (typeof window.has_separate_preview!=undefined) && (window.has_separate_preview))
 	{
 		form.setAttribute('action',form.old_action+((form.old_action.indexOf('?')==-1)?'?':'&')+'preview=1');
 		return true;
@@ -830,7 +838,7 @@ function toggle_subordinate_fields(pic,help_id)
 
 	if (((!next) && (pic.src.indexOf('expand')!=-1)) || ((next) && (next.style.display=='none'))) /* Expanding now */
 	{
-		pic.src=((pic.src.indexOf('themewizard.php')!=-1)?pic.src.replace('expand','contract'):'{$IMG;,contract}').replace(/^http:/,window.location.protocol);
+		pic.src=((pic.src.indexOf('themewizard.php')!=-1)?pic.src.replace('expand','contract'):'{$IMG;,contract}').replace(/^https?:/,window.location.protocol);
 		pic.setAttribute('alt','{!CONTRACT;}');
 		pic.setAttribute('title','{!CONTRACT;}');
 		new_state=(field_input.nodeName.toLowerCase()=='tr')?'table-row':'block';
@@ -838,7 +846,7 @@ function toggle_subordinate_fields(pic,help_id)
 		new_state_3='1px dashed';
 	} else /* Contracting now */
 	{
-		pic.src=((pic.src.indexOf('themewizard.php')!=-1)?pic.src.replace('contract','expand'):'{$IMG;,expand}').replace(/^http:/,window.location.protocol);
+		pic.src=((pic.src.indexOf('themewizard.php')!=-1)?pic.src.replace('contract','expand'):'{$IMG;,expand}').replace(/^https?:/,window.location.protocol);
 		pic.setAttribute('alt','{!EXPAND;}');
 		pic.setAttribute('title','{!EXPAND;}');
 		new_state='none';
@@ -891,7 +899,7 @@ function choose_picture(id,ob,name,event)
 		{
 			if (img.parentNode.className.indexOf(' selected')!=-1)
 			{
-				img.parentNode.className=img.parentNode.className.replace(' selected','');
+				img.parentNode.className=img.parentNode.className.replace(/ selected/g,'');
 				img.style.outline='0';
 				if (!browser_matches('ie8+')) img.style.background='none';
 			}
@@ -923,7 +931,16 @@ function disable_preview_scripts(under)
 		if ((elements[i].getAttribute('type')=='button') || (elements[i].getAttribute('type')=='image')) elements[i].onclick=no_go;
 	elements=under.getElementsByTagName('a');
 	for (i=0;i<elements.length;i++)
-		elements[i].target='false_blank'; // Real _blank would trigger annoying CSS. This is better anyway.
+	{
+		try
+		{
+			if ((!elements[i].href) || (elements[i].href.toLowerCase().indexOf('javascript:')!=0)) // guard due to weird Firefox bug, JS actions still opening new window
+			{
+				elements[i].target='false_blank'; // Real _blank would trigger annoying CSS. This is better anyway.
+			}
+		}
+		catch (e) {}; // IE can have security exceptions
+	}
 }
 
 function _set_up_change_monitor(container,input,container2)

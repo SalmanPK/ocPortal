@@ -38,7 +38,7 @@ function dload_script()
 	$site_closed=get_option('site_closed');
 	if (($site_closed=='1') && (!has_specific_permission(get_member(),'access_closed_site')) && (!$GLOBALS['IS_ACTUALLY_ADMIN']))
 	{
-		header('Content-Type: text/plain');
+		header('Content-Type: text/plain; charset='.get_charset());
 		@exit(get_option('closed'));
 	}
 
@@ -158,7 +158,7 @@ function dload_script()
 	$from=0;
 	$new_length=$size;
 
-	@ini_set('zlib.output_compression','Off');
+	safe_ini_set('zlib.output_compression','Off');
 
 	// They're trying to resume (so update our range)
 	$httprange=ocp_srv('HTTP_RANGE');
@@ -279,7 +279,9 @@ function edit_download_category($category,$parent_id,$description,$category_id,$
 	while ((!is_null($under_category_id)) && ($under_category_id!=INTEGER_MAGIC_NULL))
 	{
 		if ($category_id==$under_category_id) warn_exit(do_lang_tempcode('OWN_PARENT_ERROR'));
-		$under_category_id=$GLOBALS['SITE_DB']->query_value('download_categories','parent_id',array('id'=>$under_category_id));
+		$_under_category_id=$GLOBALS['SITE_DB']->query_value('download_categories','parent_id',array('id'=>$under_category_id));
+		if ($under_category_id===$_under_category_id) warn_exit(do_lang_tempcode('INTERNAL_ERROR'));
+		$under_category_id=$_under_category_id;
 	}
 
 	require_code('urls2');
@@ -587,7 +589,7 @@ function create_data_mash($url,$data=NULL,$extension=NULL,$direct_path=false)
 			}
 			break;
 		case 'pdf':
-			if ((ini_get('safe_mode')!='1') && (strpos(@ini_get('disable_functions'),'shell_exec')===false) && (!is_null($tmp_file)))
+			if ((str_replace(array('on','true','yes'),array('1','1','1'),strtolower(ini_get('safe_mode')))!='1') && (strpos(@ini_get('disable_functions'),'shell_exec')===false) && (!is_null($tmp_file)))
 			{
 				$enc=(get_charset()=='utf-8')?' -enc UTF-8':'';
 				$path='pdftohtml -i -noframes -stdout -hidden'.$enc.' -q -xml '.@escapeshellarg($tmp_file);
@@ -615,20 +617,61 @@ function create_data_mash($url,$data=NULL,$extension=NULL,$direct_path=false)
 		case 'ppt':
 		case 'hlp':
 //		default: // Binary formats are complex to parse, but whatsmore, as textual tagging isn't used, extraction can be done automatically as all identified text is good.
-			// Strip out interleaved nulls because they are used in wide-chars, obscuring the data
-			$sstring_regexp='[a-zA-Z0-9\'\-\x91\x92\x93\x94]';
-			$data=preg_replace('#('.$sstring_regexp.')\x00('.$sstring_regexp.')\x00#','${1}${2}',$data);
-
-			// Now try and extract strings
-			$matches=array();
-			$count=preg_match_all('#([a-zA-Z0-9\'\-\x91\x92\x93\x94\s]+)#',$data,$matches);
+			$data=str_replace("\0",'',$data); // Strip out interleaved nulls because they are used in wide-chars, obscuring the data
+			$mash='';
+			$needs_delimiter_next=false;
+			$in_portion=false;
 			$min_length=10;
 			if ($extension=='xls') $min_length=4;
-			for ($i=0;$i<$count;$i++)
+			for ($i=0;$i<strlen($data);$i++)
 			{
-				$x=$matches[1][$i];
-				if ((strlen($x)>$min_length) && ($x!=strtoupper($x)) && ($x!='Microsoft Word Document') && ($x!='WordDocument') && ($x!='SummaryInformation') && ($x!='DocumentSummaryInformation'))
-					$mash.=' '.$matches[1][$i];
+				$ch=$data[$i];
+				$chx=1;
+				$next_ok=_is_valid_data_mash_char($ch);
+				if (($next_ok) && (!$in_portion))
+				{
+					$x=$ch;
+					for ($j=$i+1;$j<strlen($data);$j++) // Count how far a new word goes
+					{
+						$_ch=$data[$j];
+						$_next_ok=_is_valid_data_mash_char($_ch);
+						if ($_next_ok)
+						{
+							$x.=$_ch;
+							$chx++;
+						} else
+						{
+							break;
+						}
+					}
+					if ((strlen($x)<$min_length) || ($x==strtoupper($x)) || ($x=='Microsoft Word Document') || ($x=='WordDocument') || ($x=='SummaryInformation') || ($x=='DocumentSummaryInformation')) // Valid word okay
+					{
+						$i=$j;
+						continue;
+					}
+				}
+
+				if (($next_ok) && ($in_portion))
+				{
+					$mash.=$ch;
+				}
+				elseif (($next_ok) && ($chx>=$min_length))
+				{
+					if ($needs_delimiter_next)
+					{
+						$mash.=' ';
+						$needs_delimiter_next=false;
+					}
+					$mash.=$ch;
+					$in_portion=true;
+				} else
+				{
+					if ($in_portion)
+					{
+						$needs_delimiter_next=true;
+						$in_portion=false;
+					}
+				}
 			}
 			break;
 	}
@@ -638,6 +681,19 @@ function create_data_mash($url,$data=NULL,$extension=NULL,$direct_path=false)
 	if (strlen($mash)>intval(1024*1024*1*0.4)) $mash=substr($mash,0,intval(1024*1024*0.4));
 
 	return $mash;
+}
+
+/**
+ * Find if a character is basically a part of a text string.
+ *
+ * @param  string				Character to test
+ * @return boolean			Whether the character is valid
+ */
+function _is_valid_data_mash_char(&$ch)
+{
+	$c=ord($ch);
+	if (($c==145) || ($c==146)) $ch="'";
+	return (($c>=65 && $c<=90) || ($c>=97 && $c<=122) || ($ch=="'") || ($ch=='-'));
 }
 
 /**
@@ -909,8 +965,8 @@ function delete_download($id,$leave=false)
 	// Delete from database
 	$GLOBALS['SITE_DB']->query_delete('download_downloads',array('id'=>$id),'',1);
 	$GLOBALS['SITE_DB']->query_delete('download_logging',array('id'=>$id));
-	$GLOBALS['SITE_DB']->query_delete('rating',array('rating_for_type'=>'downloads','rating_for_id'=>$id));
-	$GLOBALS['SITE_DB']->query_delete('trackbacks',array('trackback_for_type'=>'downloads','trackback_for_id'=>$id));
+	$GLOBALS['SITE_DB']->query_delete('rating',array('rating_for_type'=>'downloads','rating_for_id'=>strval($id)));
+	$GLOBALS['SITE_DB']->query_delete('trackbacks',array('trackback_for_type'=>'downloads','trackback_for_id'=>strval($id)));
 	require_code('notifications');
 	delete_all_notifications_on('comment_posted','downloads_'.strval($id));
 

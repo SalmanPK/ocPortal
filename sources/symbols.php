@@ -325,18 +325,32 @@ function ecv($lang,$escaped,$type,$name,$param)
 							$keywords=get_option('keywords');
 							if ($SEO_KEYWORDS===NULL) $SEO_KEYWORDS=array();
 							$keywords_array=$SEO_KEYWORDS;
-							if ($keywords!='') $keywords_array=array_merge($keywords_array,explode(',',$keywords));
+							if ($keywords!='') $keywords_array=array_merge($keywords_array,array_map('trim',explode(',',$keywords)));
 							$value=implode(',',array_unique($keywords_array));
 							break;
 
 						default:
 							if (isset($param[1]))
 							{
+								$matches=array();
+								if (($param[0]=='image') && (preg_match('#^'.preg_quote(find_script('attachment'),'#').'\?id=(\d+)#',$param[1],$matches)!=0))
+								{
+									require_code('attachments');
+									if (!has_attachment_access($GLOBALS['FORUM_DRIVER']->get_guest_id(),intval($matches[1])))
+									{
+										break;
+									}
+								}
+
 								$META_DATA[$param[0]]=$param[1];
 							} else
 							{
-								$value=isset($META_DATA[$param[0]])?strip_comcode($META_DATA[$param[0]]):'';
+								$value=isset($META_DATA[$param[0]])?$META_DATA[$param[0]]:'';
 								if ($value===NULL) $value='';
+								if ($param[0]=='title' || $param[0]=='description')
+								{
+									$value=strip_comcode($value);
+								}
 							}
 					}
 				}
@@ -746,6 +760,10 @@ function ecv($lang,$escaped,$type,$name,$param)
 				}
 				break;
 
+			case '_POSTED':
+				$value=(count($_POST)==0)?'0':'1';
+				break;
+
 			case 'STAFF_ACTIONS':
 				if (!is_guest())
 				{
@@ -761,7 +779,7 @@ function ecv($lang,$escaped,$type,$name,$param)
 			case 'TRIM':
 				if (isset($param[0]))
 				{
-					$value=ocp_trim($param[0],isset($param[1]) && $param[1]=='1');
+					$value=ocp_trim($param[0],!isset($param[1]) || $param[1]=='1');
 				}
 				break;
 
@@ -827,7 +845,7 @@ function ecv($lang,$escaped,$type,$name,$param)
 
 			case 'AVATAR':
 				$value=$GLOBALS['FORUM_DRIVER']->get_member_avatar_url(isset($param[0])?intval($param[0]):get_member());
-				if ((url_is_local($value)) && ($value!='')) $value=get_base_url().'/'.$value;
+				if ((url_is_local($value)) && ($value!='')) $value=get_custom_base_url().'/'.$value;
 				break;
 
 			case 'IS_GUEST':
@@ -985,7 +1003,7 @@ function ecv($lang,$escaped,$type,$name,$param)
 				if (isset($param[0]))
 				{
 					$value=$GLOBALS['FORUM_DRIVER']->get_member_photo_url(intval($param[0]));
-					if ((url_is_local($value)) && ($value!='')) $value=get_base_url().'/'.$value;
+					if ((url_is_local($value)) && ($value!='')) $value=get_custom_base_url().'/'.$value;
 				}
 				break;
 
@@ -1042,7 +1060,7 @@ function ecv($lang,$escaped,$type,$name,$param)
 					if (array_key_exists('scheme',$url_bits))
 					{
 						$value=$url_bits['scheme'].'://'.(array_key_exists('host',$url_bits)?$url_bits['host']:'localhost');
-						if ((array_key_exists('port',$url_bits)) && ($url_bits['port']!=80)) $value.=':'.$url_bits['port'];
+						if ((array_key_exists('port',$url_bits)) && ($url_bits['port']!=80)) $value.=':'.strval($url_bits['port']);
 					}
 					if (array_key_exists('path',$url_bits)) $value.=$url_bits['path'];
 				}
@@ -1623,7 +1641,7 @@ function ecv($lang,$escaped,$type,$name,$param)
 				if (get_forum_type()=='ocf')
 				{
 					$member_info=ocf_read_in_member_profile(get_member(),true);
-					$_new_topics=$GLOBALS['FORUM_DB']->query('SELECT COUNT(*) AS mycnt FROM '.$GLOBALS['FORUM_DB']->get_table_prefix().'f_topics WHERE NOT t_forum_id IS NULL AND t_cache_first_time>'.strval((integer)$member_info['last_visit_time']));
+					$_new_topics=$GLOBALS['FORUM_DB']->query('SELECT COUNT(*) AS mycnt FROM '.$GLOBALS['FORUM_DB']->get_table_prefix().'f_topics WHERE t_forum_id IS NOT NULL AND t_cache_first_time>'.strval((integer)$member_info['last_visit_time']));
 					$new_topics=$_new_topics[0]['mycnt'];
 					$value=strval($new_topics);
 				}
@@ -1633,7 +1651,7 @@ function ecv($lang,$escaped,$type,$name,$param)
 				if (get_forum_type()=='ocf')
 				{
 					$member_info=ocf_read_in_member_profile(get_member(),true);
-					$_new_posts=$GLOBALS['FORUM_DB']->query('SELECT COUNT(*) AS mycnt FROM '.$GLOBALS['FORUM_DB']->get_table_prefix().'f_posts WHERE NOT p_cache_forum_id IS NULL AND p_time>'.strval((integer)$member_info['last_visit_time']));
+					$_new_posts=$GLOBALS['FORUM_DB']->query('SELECT COUNT(*) AS mycnt FROM '.$GLOBALS['FORUM_DB']->get_table_prefix().'f_posts WHERE p_cache_forum_id IS NOT NULL AND p_time>'.strval((integer)$member_info['last_visit_time']));
 					$new_posts=$_new_posts[0]['mycnt'];
 					$value=strval($new_posts);
 				}
@@ -1789,14 +1807,28 @@ function ecv($lang,$escaped,$type,$name,$param)
 			case 'PREG_MATCH':
 				if (isset($param[1]))
 				{
+					$GLOBALS['SUPPRESS_ERROR_DEATH']=true;
 					$value=(preg_match('#'.str_replace('#','\#',$param[0]).'#'.(isset($param[2])?str_replace('e','',$param[2]):''),$param[1])!=0)?'1':'0';
+					$GLOBALS['SUPPRESS_ERROR_DEATH']=false;
+					if (isset($php_errormsg))
+					{
+						attach_message($php_errormsg,'warn');
+					}
 				}
 				break;
 
 			case 'PREG_REPLACE':
 				if (isset($param[2]))
 				{
+					$GLOBALS['SUPPRESS_ERROR_DEATH']=true;
 					$value=preg_replace('#'.str_replace('#','\#',$param[0]).'#'.(isset($param[3])?str_replace('e','',$param[3]):''),$param[1],$param[2]);
+					$GLOBALS['SUPPRESS_ERROR_DEATH']=false;
+					if (isset($php_errormsg))
+					{
+						attach_message($php_errormsg,'warn');
+					}
+
+					if ($GLOBALS['XSS_DETECT'] && ocp_is_escaped($param[0])) ocp_mark_as_escaped($value);
 				}
 				break;
 
@@ -1863,6 +1895,7 @@ function ecv($lang,$escaped,$type,$name,$param)
 				if (isset($param[0]))
 				{
 					$value=ocp_mb_ucwords($param[0]);
+					if ($GLOBALS['XSS_DETECT'] && ocp_is_escaped($param[0])) ocp_mark_as_escaped($value);
 				}
 				break;
 
@@ -1870,6 +1903,7 @@ function ecv($lang,$escaped,$type,$name,$param)
 				if (isset($param[0]))
 				{
 					$value=ocp_mb_strtolower($param[0]);
+					if ($GLOBALS['XSS_DETECT'] && ocp_is_escaped($param[0])) ocp_mark_as_escaped($value);
 				}
 				break;
 
@@ -1877,6 +1911,7 @@ function ecv($lang,$escaped,$type,$name,$param)
 				if (isset($param[0]))
 				{
 					$value=ocp_mb_strtoupper($param[0]);
+					if ($GLOBALS['XSS_DETECT'] && ocp_is_escaped($param[0])) ocp_mark_as_escaped($value);
 				}
 				break;
 
@@ -1891,6 +1926,7 @@ function ecv($lang,$escaped,$type,$name,$param)
 				if (isset($param[2]))
 				{
 					$value=str_replace($param[0],$param[1],$param[2]);
+					if ($GLOBALS['XSS_DETECT'] && ocp_is_escaped($param[0])) ocp_mark_as_escaped($value);
 				}
 				break;
 
@@ -1944,6 +1980,7 @@ function ecv($lang,$escaped,$type,$name,$param)
 				if (isset($param[1]))
 				{
 					$value=ocp_mb_substr($param[0],intval($param[1]),isset($param[2])?intval($param[2]):strlen($param[0]));
+					if ($GLOBALS['XSS_DETECT'] && ocp_is_escaped($param[0])) ocp_mark_as_escaped($value);
 				}
 				break;
 
@@ -1959,6 +1996,7 @@ function ecv($lang,$escaped,$type,$name,$param)
 				{
 					$cut=isset($param[3]) && ($param[3]=='1');
 					$value=wordwrap($param[0],intval($param[1]),isset($param[2])?$param[2]:'<br />',$cut);
+					if ($GLOBALS['XSS_DETECT'] && ocp_is_escaped($param[0])) ocp_mark_as_escaped($value);
 				}
 				break;
 
@@ -2087,14 +2125,14 @@ function ecv($lang,$escaped,$type,$name,$param)
 					{
 						$value=fix_id($param[0]);
 					}
-					if (($GLOBALS['XSS_DETECT']) && (ocp_is_escaped($param[0]))) ocp_mark_as_escaped($value);
+					if ($GLOBALS['XSS_DETECT']) ocp_mark_as_escaped($value);
 				}
 				break;
 
 			case 'INSERT_SPAMMER_BLACKHOLE':
 				if (get_option('spam_blackhole_detection')=='1')
 				{
-					$field_name='x'.md5(get_site_name().': antispam');
+					$field_name=md5(get_site_name().': antispam');
 					$value='<div id="'.escape_html($field_name).'_wrap" style="display:none"><label for="'.escape_html($field_name).'">'.do_lang('DO_NOT_FILL_ME_SPAMMER_BLACKHOLE').'</label><input id="'.escape_html($field_name).'" name="'.escape_html($field_name).'" value="" type="text" /></div>';
 					if (!$GLOBALS['SEMI_DEV_MODE'])
 						$value.='<script type="text/javascript">// <'.'![CDATA['.chr(10).'var wrap=document.getElementById(\''.escape_html($field_name).'_wrap\'); wrap.parentNode.removeChild(wrap);'.chr(10).'//]]></script>';
@@ -2218,12 +2256,23 @@ function ecv($lang,$escaped,$type,$name,$param)
 				break;
 
 			case 'SELF_PAGE_LINK':
-				$value=url_to_pagelink(static_evaluate_tempcode(build_url(array(),'_SELF',NULL,true,false,true)));
+				$value='';
+				if (running_script('index') || running_script('iframe'))
+				{
+					$value=get_zone_name().':'.get_page_name();
+					foreach ($_GET as $key=>$val)
+					{
+						if ($key=='page') continue;
+						if (is_array($val)) continue;
+						if (substr($key,0,5)=='keep_') continue;
+						$value.=':'.$key.'='.$val;
+					}
+				}
 				break;
 
 			case 'SET_TUTORIAL_LINK':
 				$value='';
-				if (array_key_exists(1,$param))
+				if ((array_key_exists(1,$param)) && ($param[1]!='') && ($param[1][0]!='#'))
 				{
 					set_tutorial_link($param[0],$param[1]);
 				}
@@ -2863,6 +2912,11 @@ function symbol_truncator($param,$type,$tooltip_if_truncated=NULL)
 		$param[3]='1';
 	}
 
+	if ($GLOBALS['XSS_DETECT'])
+	{
+		$is_escaped=ocp_is_escaped($param[0]);
+	}
+
 	$amount=intval(isset($param[1])?$param[1]:'60');
 	$is_html=((isset($param[3])) && ($param[3]=='1'));
 	if ($is_html)
@@ -2934,6 +2988,11 @@ function symbol_truncator($param,$type,$tooltip_if_truncated=NULL)
 		$value=$html;
 	}
 
+	if ($GLOBALS['XSS_DETECT'])
+	{
+		if ($is_escaped || !$is_html/*Will have been explicitly escaped by this function*/) ocp_mark_as_escaped($value);
+	}
+
 	return $value;
 }
 
@@ -2976,15 +3035,43 @@ function keep_symbol($param)
  * @param  boolean		Whether to keep doing it, while it changes (if complex mixtures are on the end).
  * @return string			The result text.
  */
-function ocp_trim($text,$try_hard=false)
+function ocp_trim($text,$try_hard=true)
 {
 	if (memory_get_usage()>1024*1024*40) return trim($text); // Don't have enough memory
+
+	if ($GLOBALS['XSS_DETECT'])
+	{
+		$is_escaped=ocp_is_escaped($text);
+	}
+
+	// Intentionally not using regexps, as actually using substr is a lot faster and uses much less memory
+
 	do
 	{
 		$before=$text;
-		$text=preg_replace(array('#^\s+#','#^(<br\s*/?'.'>\s*)+#','#^(&nbsp;)+#','#\s+$#','#(<br\s*/?'.'>\s*)+$#','#(&nbsp;)+$#'),array('','','','','',''),$text);
+		if (strtolower(substr($text,0,6))=='<br />') $text=substr($text,6);
+		if (strtolower(substr($text,0,5))=='<br/>') $text=substr($text,5);
+		if (strtolower(substr($text,0,4))=='<br>') $text=substr($text,4);
+		if (strtolower(substr($text,0,6))=='&nbsp;') $text=substr($text,6);
+		$text=ltrim($text);
 	}
 	while (($try_hard) && ($before!=$text));
+	do
+	{
+		$before=$text;
+		if (strtolower(substr($text,-6))=='<br />') $text=substr($text,0,-6);
+		if (strtolower(substr($text,-5))=='<br/>') $text=substr($text,0,-5);
+		if (strtolower(substr($text,-4))=='<br>') $text=substr($text,0,-4);
+		if (strtolower(substr($text,-6))=='&nbsp;') $text=substr($text,0,-6);
+		$text=rtrim($text);
+	}
+	while (($try_hard) && ($before!=$text));
+
+	if ($GLOBALS['XSS_DETECT'])
+	{
+		if ($is_escaped) ocp_mark_as_escaped($text);
+	}
+
 	return $text;
 }
 

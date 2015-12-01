@@ -50,7 +50,7 @@ function catalogue_file_script()
 	$site_closed=get_option('site_closed');
 	if (($site_closed=='1') && (!has_specific_permission(get_member(),'access_closed_site')) && (!$GLOBALS['IS_ACTUALLY_ADMIN']))
 	{
-		header('Content-Type: text/plain');
+		header('Content-Type: text/plain; charset='.get_charset());
 		@exit(get_option('closed'));
 	}
 
@@ -103,7 +103,7 @@ function catalogue_file_script()
 	$from=0;
 	$new_length=$size;
 
-	@ini_set('zlib.output_compression','Off');
+	safe_ini_set('zlib.output_compression','Off');
 
 	// They're trying to resume (so update our range)
 	$httprange=ocp_srv('HTTP_RANGE');
@@ -257,7 +257,7 @@ function actual_add_catalogue_field($c_name,$name,$description,$type,$order,$def
 				$map=array('cf_id'=>$cf_id,'ce_id'=>$entry,'cv_value'=>((is_null($_default)) || ($_default==''))?NULL:intval($_default));
 			} else
 			{
-				$map=array('cf_id'=>$cf_id,'ce_id'=>$entry,'cv_value'=>$_default);
+				$map=array('cf_id'=>$cf_id,'ce_id'=>$entry,'cv_value'=>(is_null($default) || ($type=='list') || ($type=='radiolist') || ($type=='multilist'))?'':$_default);
 			}
 			$GLOBALS['SITE_DB']->query_insert('catalogue_efv_'.$_type,$map);
 		}
@@ -610,7 +610,9 @@ function actual_edit_catalogue_category($id,$title,$description,$notes,$parent_i
 	while ((!is_null($under_category_id)) && ($under_category_id!=INTEGER_MAGIC_NULL))
 	{
 		if ($id==$under_category_id) warn_exit(do_lang_tempcode('OWN_PARENT_ERROR'));
-		$under_category_id=$GLOBALS['SITE_DB']->query_value('catalogue_categories','cc_parent_id',array('id'=>$under_category_id));
+		$_under_category_id=$GLOBALS['SITE_DB']->query_value('catalogue_categories','cc_parent_id',array('id'=>$under_category_id));
+		if ($under_category_id===$_under_category_id) warn_exit(do_lang_tempcode('INTERNAL_ERROR'));
+		$under_category_id=$_under_category_id;
 	}
 
 	$rows=$GLOBALS['SITE_DB']->query_select('catalogue_categories',array('cc_description','cc_title'),array('id'=>$id),'',1);
@@ -871,7 +873,8 @@ function actual_edit_catalogue_entry($id,$category_id,$validated,$notes,$allow_r
 	$_fields=list_to_map('id',$GLOBALS['SITE_DB']->query_select('catalogue_fields',array('id','cf_type'),array('c_name'=>$catalogue_name)));
 	$fields=collapse_2d_complexity('id','cf_type',$_fields);
 
-	$original_submitter=$GLOBALS['SITE_DB']->query_value('catalogue_entries','ce_submitter',array('id'=>$id));
+	$original_submitter=$GLOBALS['SITE_DB']->query_value_null_ok('catalogue_entries','ce_submitter',array('id'=>$id));
+	if (is_null($original_submitter)) warn_exit(do_lang_tempcode('MISSING_RESOURCE'));
 
 	$old_category_id=$GLOBALS['SITE_DB']->query_value('catalogue_entries','cc_id',array('id'=>$id));
 
@@ -1042,8 +1045,8 @@ function actual_delete_catalogue_entry($id)
 	$GLOBALS['SITE_DB']->query_delete('catalogue_efv_integer',array('ce_id'=>$id));
 
 	$GLOBALS['SITE_DB']->query_delete('catalogue_entries',array('id'=>$id),'',1);
-	$GLOBALS['SITE_DB']->query_delete('trackbacks',array('trackback_for_type'=>'catalogues','trackback_for_id'=>$id));
-	$GLOBALS['SITE_DB']->query_delete('rating',array('rating_for_type'=>'catalogues','rating_for_id'=>$id));
+	$GLOBALS['SITE_DB']->query_delete('trackbacks',array('trackback_for_type'=>'catalogues','trackback_for_id'=>strval($id)));
+	$GLOBALS['SITE_DB']->query_delete('rating',array('rating_for_type'=>'catalogues','rating_for_id'=>strval($id)));
 	require_code('notifications');
 	delete_all_notifications_on('comment_posted','catalogues_'.strval($id));
 

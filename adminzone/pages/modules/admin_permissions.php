@@ -36,7 +36,7 @@ class Module_admin_permissions
 		$info['organisation']='ocProducts';
 		$info['hacked_by']=NULL;
 		$info['hack_version']=NULL;
-		$info['version']=7;
+		$info['version']=8;
 		$info['update_require_upgrade']=1;
 		$info['locked']=true;
 		return $info;
@@ -74,6 +74,7 @@ class Module_admin_permissions
 		delete_specific_permission('see_software_docs');
 		delete_specific_permission('bypass_validation_lowrange_content');
 		delete_specific_permission('may_enable_staff_notifications');
+		delete_specific_permission('unfiltered_input');
 
 		$false_permissions=get_false_permissions();
 		foreach ($false_permissions as $permission)
@@ -97,6 +98,11 @@ class Module_admin_permissions
 				'k_message'=>'LONG_TRANS',
 				'k_match_key'=>'SHORT_TEXT'
 			));
+		}
+
+		if ((is_null($upgrade_from)) || ($upgrade_from<8))
+		{
+			add_specific_permission('SUBMISSION','unfiltered_input',false);
 		}
 
 		if ((is_null($upgrade_from)) || ($upgrade_from<7))
@@ -462,8 +468,6 @@ class Module_admin_permissions
 
 		$post_url=get_self_url(false,false,NULL,false,true);
 
-		breadcrumb_set_self(do_lang_tempcode('CHOOSE'));
-
 		return do_template('FORM_SCREEN',array('_GUID'=>'457a5b8200991996b383bf75515382ab','GET'=>true,'SKIP_VALIDATION'=>true,'HIDDEN'=>'','SUBMIT_NAME'=>do_lang_tempcode('CHOOSE'),'TITLE'=>$title,'FIELDS'=>$fields,'URL'=>$post_url,'TEXT'=>''));
 	}
 
@@ -650,6 +654,8 @@ class Module_admin_permissions
 
 			foreach (array_keys($pages) as $page)
 			{
+				if (is_integer($page)) $page=strval($page);
+
 				$cells=new ocp_tempcode();
 				$code='';
 
@@ -677,7 +683,9 @@ class Module_admin_permissions
 			}
 		}
 
-		breadcrumb_set_parents(array(array('_SELF:_SELF:page',do_lang_tempcode('CHOOSE'))));
+		breadcrumb_set_parents(array(array('_SELF:_SELF:page',do_lang_tempcode('PAGE_ACCESS'))));
+
+		breadcrumb_set_self(($zone=='')?do_lang('_WELCOME'):escape_html($zone));
 
 		return do_template('PERMISSION_SCREEN_PERMISSIONS_SCREEN',array('_GUID'=>'1cfa15b2fd8c2828c897c6a5c974b201','COLS'=>$cols,'ZONE'=>$zone,'TITLE'=>$title,'URL'=>$url,'HEADER_CELLS'=>$header_cells,'ROWS'=>$rows));
 	}
@@ -722,7 +730,7 @@ class Module_admin_permissions
 			}
 		}
 
-		breadcrumb_set_parents(array(array('_SELF:_SELF:page',do_lang_tempcode('CHOOSE')),array('_SELF:_SELF:page:zone='.$zone,do_lang_tempcode('PAGE_ACCESS'))));
+		breadcrumb_set_parents(array(array('_SELF:_SELF:page',do_lang_tempcode('PAGE_ACCESS')),array('_SELF:_SELF:page:zone='.$zone,($zone=='')?do_lang('_WELCOME'):escape_html($zone))));
 		breadcrumb_set_self(do_lang_tempcode('DONE'));
 
 		decache('main_sitemap');
@@ -986,7 +994,8 @@ class Module_admin_permissions
 		}
 		$sections->attach(do_template('PERMISSION_S_CONFIG_SECTION',array('_GUID'=>'c75a07373f54c0fa31d18e360fcf26f6','COLS'=>$cols,'HEADER_CELLS'=>$header_cells,'SECTION'=>$rows,'CURRENT_SECTION'=>do_lang_tempcode($current_section))));
 
-		breadcrumb_set_parents(array(array('_SELF:_SELF:specific',do_lang_tempcode('CHOOSE'))));
+		breadcrumb_set_parents(array(array('_SELF:_SELF:specific',do_lang_tempcode('PRIVILEGES'))));
+		breadcrumb_set_self(do_lang_tempcode($p_section));
 
 		return do_template('PERMISSION_S_PERMISSIONS_SCREEN',array('_GUID'=>'11974f0a137266a625991d3611b8e587','TITLE'=>$title,'URL'=>$url,'SECTIONS'=>$sections));
 	}
@@ -1045,7 +1054,7 @@ class Module_admin_permissions
 			}
 		}
 
-		breadcrumb_set_parents(array(array('_SELF:_SELF:specific',do_lang_tempcode('CHOOSE'))));
+		breadcrumb_set_parents(array(array('_SELF:_SELF:specific',do_lang_tempcode('PRIVILEGES'))));
 
 		decache('main_sitemap');
 		$GLOBALS['SITE_DB']->query_delete('cache');

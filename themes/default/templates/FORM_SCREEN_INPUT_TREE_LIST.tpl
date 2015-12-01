@@ -4,7 +4,7 @@
 </div>
 <script type="text/javascript">// <![CDATA[
 	add_event_listener_abstract(window,'load',function () {
-		new tree_list('{NAME*;}','data/ajax_tree.php?hook={HOOK&;}{$KEEP;}','{ROOT_ID&;}','{OPTIONS&;}',{$?,{MULTI_SELECT},true,false},{TABINDEX%},false{+START,IF,{USE_SERVER_ID}},true{+END});
+		new tree_list('{NAME;/}','data/ajax_tree.php?hook={HOOK&;}{$KEEP;/}','{ROOT_ID&;/}','{OPTIONS&;/}',{$?,{MULTI_SELECT},true,false},{TABINDEX%},false{+START,IF,{USE_SERVER_ID}},true{+END});
 	} );
 //]]></script>
 
@@ -13,7 +13,7 @@
 </p>
 {+START,IF_NON_EMPTY,{DEFAULT}}
 	<p class="associated_details">
-		{!TREE_LIST_FEEDBACK,<span class="whitespace_visible" id="{NAME*}_mirror">{NICE_LABEL`}</span>}
+		{!TREE_LIST_FEEDBACK,<span class="whitespace_visible" id="{NAME*}_mirror">{NICE_LABEL*}</span>}
 	</p>
 {+END}
 

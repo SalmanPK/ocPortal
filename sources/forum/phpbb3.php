@@ -85,45 +85,53 @@ function _hash_crypt_private($password, $setting, &$itoa64)
 {
 	$output='*';
 
-	// Check for correct hash
-	if (substr($setting, 0, 3) != '$H$')
+	if (substr($setting, 0, 3) == '$H$')
 	{
-		return $output;
+		$count_log2=strpos($itoa64, $setting[3]);
+
+		if ($count_log2 < 7 || $count_log2 > 30)
+		{
+			return $output;
+		}
+
+		$count=1 << $count_log2;
+		$salt=substr($setting, 4, 8);
+
+		if (strlen($salt) != 8)
+		{
+			return $output;
+		}
+
+		/**
+		* We're kind of forced to use MD5 here since it's the only
+		* cryptographic primitive available in all versions of PHP
+		* currently in use.  To implement our own low-level crypto
+		* in PHP would result in much worse performance and
+		* consequently in lower iteration counts and hashes that are
+		* quicker to crack (by non-PHP code).
+		*/
+		$hash=pack('H*', md5($salt . $password));
+		do
+		{
+			$hash=pack('H*', md5($hash . $password));
+			--$count;
+		}
+		while ($count>0);
+
+		$output=substr($setting, 0, 12);
+		$output.=_hash_encode64($hash, 16, $itoa64);
 	}
 
-	$count_log2=strpos($itoa64, $setting[3]);
-
-	if ($count_log2 < 7 || $count_log2 > 30)
+	if ((substr($setting, 0, 3) == '$2y') || (substr($setting, 0, 3) == '$2a$'))
 	{
-		return $output;
+		$hash=$setting;
+		$salt=substr($hash,0,29);
+		$output=crypt($password,$salt);
+		if (strlen($output) < 60)
+		{
+			return '';
+		}
 	}
-
-	$count=1 << $count_log2;
-	$salt=substr($setting, 4, 8);
-
-	if (strlen($salt) != 8)
-	{
-		return $output;
-	}
-
-	/**
-	* We're kind of forced to use MD5 here since it's the only
-	* cryptographic primitive available in all versions of PHP
-	* currently in use.  To implement our own low-level crypto
-	* in PHP would result in much worse performance and
-	* consequently in lower iteration counts and hashes that are
-	* quicker to crack (by non-PHP code).
-	*/
-	$hash=pack('H*', md5($salt . $password));
-	do
-	{
-		$hash=pack('H*', md5($hash . $password));
-		--$count;
-	}
-	while ($count>0);
-
-	$output=substr($setting, 0, 12);
-	$output.=_hash_encode64($hash, 16, $itoa64);
 
 	return $output;
 }
@@ -695,7 +703,7 @@ class forum_driver_phpbb3 extends forum_driver_base
 	 * Get a URL to the specified topic ID. Most forums don't require the second parameter, but some do, so it is required in the interface.
 	 *
 	 * @param  integer		The topic ID
-	 * @param string			The forum ID
+	 * @param  string			The forum ID
 	 * @return URLPATH		The URL to the topic
 	 */
 	function topic_url($id,$forum)
@@ -708,7 +716,7 @@ class forum_driver_phpbb3 extends forum_driver_base
 	 * Get a URL to the specified post id.
 	 *
 	 * @param  integer		The post id
-	 * @param string			The forum ID
+	 * @param  string			The forum ID
 	 * @return URLPATH		The URL to the post
 	 */
 	function post_url($id,$forum)
@@ -1380,10 +1388,11 @@ class forum_driver_phpbb3 extends forum_driver_base
 			}
 		} else
 		{
+			$rows=array();
 			$rows[0]=$this->get_member_row($userid);
 		}
 
-		if (!array_key_exists(0,$rows)) // All hands to lifeboats
+		if (!array_key_exists(0,$rows) || $rows[0]==null) // All hands to lifeboats
 		{
 			$out['error']=(do_lang_tempcode('_USER_NO_EXIST',$username));
 			return $out;

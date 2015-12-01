@@ -33,10 +33,10 @@ function splurgh(save_to,key_name,url_stub,range_a,range_b,level,data,chain,not_
 	contents+='<a id=\"'+anchor_reference+'\" name=\"'+anchor_reference+'\"></a>\n';
 	if (url_stub.indexOf('cedi')==-1)
 	{
-		contents+='<a href=\"'+escape_html(url_stub)+((url_stub.indexOf('?')==-1)?'?':'&amp;')+'chain='+chain+'&amp;'+key_name+'='+anchor_reference+'\">'+next_title+'</a>\n';
+		contents+='<a href=\"'+escape_html(url_stub)+((url_stub.indexOf('?')==-1)?'?':'&amp;')+'chain='+chain+'&amp;'+key_name+'='+anchor_reference+'\">'+escape_html(next_title)+'</a>\n';
 	} else
 	{
-		contents+='<a href=\"'+escape_html(url_stub)+((url_stub.indexOf('?')==-1)?'?':'&amp;')+key_name+'='+chain.replace(/~/g,'/').replace(/^\//,'')+'/'+anchor_reference+'\">'+next_title+'</a>\n';
+		contents+='<a href=\"'+escape_html(url_stub)+((url_stub.indexOf('?')==-1)?'?':'&amp;')+key_name+'='+chain.replace(/~/g,'/').replace(/^\//,'')+'/'+anchor_reference+'\">'+escape_html(next_title)+'</a>\n';
 	}
 
 	if (to+1<data.length)
@@ -61,7 +61,7 @@ function splurgh(save_to,key_name,url_stub,range_a,range_b,level,data,chain,not_
 			under=splurgh(save_to,key_name,url_stub,a,b,level+1,data,chain+'~'+anchor_reference,true);
 			if (under!='')
 			{
-				contents+='<a class=\"toggleable_tray_button\" href=\"#\" onclick=\"return toggleable_tray(this.parentNode);\"><img title=\"\" alt=\"{!EXPAND^#}/{!CONTRACT^#}\" src=\"'+"{$IMG*#,contract}".replace(/^http:/,window.location.protocol)+'\" /></a>\n';
+				contents+='<a class=\"toggleable_tray_button\" href=\"#\" onclick=\"return toggleable_tray(this.parentNode);\"><img title=\"\" alt=\"{!EXPAND^#}/{!CONTRACT^#}\" src=\"'+"{$IMG*#,contract}".replace(/^https?:/,window.location.protocol)+'\" /></a>\n';
 				contents+='<ul class=\"toggleable_tray\">\n';
 				contents+=under;
 				contents+='</ul>\n';

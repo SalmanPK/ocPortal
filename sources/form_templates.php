@@ -318,7 +318,7 @@ function get_field_restrict_property($property,$field,$page=NULL,$type=NULL)
 				foreach ($_restrictions as $bits)
 				{
 					list($restriction,$attributes)=$bits;
-					if (strtolower($restriction)==strtolower($field)) return $bits['embed'];
+					if (strtolower($restriction)==strtolower($property)) return $bits[1]['embed'];
 				}
 			}
 		}
@@ -1750,7 +1750,7 @@ function get_form_field_tabindex($tabindex=NULL)
  * @param  string			The name of the radio button group this will be put in (i.e. the name the value presented here will be possibly matched against)
  * @param  string			The value for this entry
  * @param  boolean		Whether this entry is selected by default or not
- * @param  mixed			The text associated with this choice (blank: just use name for text)
+ * @param  mixed			The text associated with this choice (blank: just use value for text)
  * @param  ?integer		The tab index of the field (NULL: not specified)
  * @param  mixed			An additional long description (blank: no description)
  * @return tempcode		The input field
@@ -1759,7 +1759,7 @@ function form_input_radio_entry($name,$value,$selected=false,$text='',$tabindex=
 {
 	$tabindex=get_form_field_tabindex($tabindex);
 
-	if ((is_string($text)) && ($text=='')) $text=$name;
+	if ((is_string($text)) && ($text=='')) $text=$value;
 
 	$selected=(filter_form_field_default($name,$selected?'1':'')=='1');
 

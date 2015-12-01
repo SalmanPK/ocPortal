@@ -22,7 +22,7 @@ If running on Windows, you need to install the following commands in your path..
 */
 
 restrictify();
-@ini_set('ocproducts.xss_detect','0');
+safe_ini_set('ocproducts.xss_detect','0');
 
 disable_php_memory_limit();
 
@@ -127,6 +127,7 @@ function phase_1_pre()
 		<li>Run the <a href="'.escape_html(get_base_url().'/_test').'">unit tests</a><!--, with debug mode on, on the custom ocPortal PHP version-->.</li>
 		<li>Write custom theme upgrading code into <kbd>sources/upgrade.php</kbd>. Make sure all ocProducts themes are up-to-date (CSS changes, template changes, theme image changes).</li>
 		<li>Make sure <kbd>curl-ca-bundle.crt</kbd> is reasonable up-to-date.</li>
+		<li>For all data entry forms, add <kbd>'.escape_html('<IMG """><SCRIPT>alert("XSS hole")</SCRIPT>"><script>alert(\'XSS hole\')</script>').'</kbd> wherever possible. Go through all screens on the sitemap, all Comcode tags in the add tag assistant, and all blocks in the add block assistant, ensuring no alerts or corruption (double-escaping or other bad output) happens.</li>
 	</ul>
 	<p>Ideally do these at least on some major versions:</p>
 	<ul>
@@ -240,7 +241,7 @@ function phase_2()
 	}
 	echo '
 		<li>
-			<strong>Upload</strong>: Upload all built files to ocPortal.com server (<kbd>uploads/downloads</kbd>)
+			<strong>Upload</strong>: Upload all built files (in <kbd>builds/'.escape_html($version_dotted).'</kbd>) to ocPortal.com server (<kbd>uploads/downloads</kbd>)
 		</li>
 		<li>
 			<strong>Add to ocPortal.com</strong>: Run the <form target="_blank" onclick="window.setTimeout(undo_staff_unload_action,1000);" style="display: inline" action="'.escape_html($push_url).'" method="post"><input type="hidden" name="changes" value="'.escape_html($changes).'" /><input type="submit" value="ocPortal.com setup script" /></form>. Note if you are re-releasing, this will still work &ndash; it will update existing entries appropriately.

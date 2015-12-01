@@ -268,7 +268,7 @@ class Module_purchase
 				$price=currency_convert(floatval($details[1]),$currency,NULL,true);
 
 				$description=$details[4];
-				if (strpos($details[4],(strpos($details[4],'.')===false)?preg_replace('#\.00($|[^\d])#','',$price):$price)===false)
+				if ($price!='' && strpos($details[4],(strpos($details[4],'.')===false)?preg_replace('#\.00($|[^\d])#','',$price):$price)===false)
 					$description.=(' ('.$price.')');
 				$list->attach(form_input_list_entry($product,false,protect_from_escaping($description)));
 			}
@@ -473,7 +473,7 @@ class Module_purchase
 			$result=do_template($tpl,array('LOGOS'=>$logos,'TRANSACTION_BUTTON'=>$transaction_button,'CURRENCY'=>get_option('currency'),'ITEM_NAME'=>$item_name,'TITLE'=>$title,'LENGTH'=>is_null($length)?'':strval($length),'LENGTH_UNITS'=>$length_units,'PURCHASE_ID'=>$purchase_id,'PRICE'=>float_to_raw_string(floatval($price))));
 		} else // Handle the transaction internally
 		{
-			if (((ocp_srv('HTTPS')=='') || (ocp_srv('HTTPS')=='off')) && (!ecommerce_test_mode()))
+			if ((!tacit_https()) && (!ecommerce_test_mode()))
 			{
 				warn_exit(do_lang_tempcode('NO_SSL_SETUP'));
 			}

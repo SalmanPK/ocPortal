@@ -174,7 +174,7 @@ class Hook_search_ocf_members
 				break;
 
 			default:
-				$remapped_orderer=$sort;
+				$remapped_orderer=preg_replace('#[^\w]#','',$sort);
 				break;
 		}
 
@@ -208,7 +208,7 @@ class Hook_search_ocf_members
 				$non_trans_fields++;
 			}
 		}
-		$index_issue=($non_trans_fields>16);
+		$index_issue=(get_param_integer('force_like',0)==0) && ($non_trans_fields>16);
 		foreach ($rows as $i=>$row)
 		{
 			if (!array_key_exists('field_'.strval($row['id']),$indexes)) continue;
@@ -221,7 +221,19 @@ class Hook_search_ocf_members
 			{
 				$where_clause.=' AND ';
 
-				if ((db_has_full_text($GLOBALS['SITE_DB']->connection_read)) && (method_exists($GLOBALS['SITE_DB']->static_ob,'db_has_full_text_boolean')) && ($GLOBALS['SITE_DB']->static_ob->db_has_full_text_boolean()) && (!is_under_radar($param)))
+				if ($storage_type=='integer')
+				{
+					$temp='?='.strval(intval($param));
+				}
+				elseif ($storage_type=='float')
+				{
+					$temp='?='.float_to_raw_string(floatval($param));
+				}
+				elseif ($row['cf_type']=='list' || $row['cf_type']=='combo')
+				{
+					$temp=db_string_equal_to('?',$param);
+				}
+				elseif ((db_has_full_text($GLOBALS['SITE_DB']->connection_read)) && (method_exists($GLOBALS['SITE_DB']->static_ob,'db_has_full_text_boolean')) && ($GLOBALS['SITE_DB']->static_ob->db_has_full_text_boolean()) && (!is_under_radar($param)))
 				{
 					$temp=db_full_text_assemble('"'.$param.'"',true);
 				} else
@@ -379,7 +391,7 @@ class Hook_search_ocf_members
 		}
 		//if (has_specific_permission(get_member(),'view_profiles'))
 		{
-			if ((get_option('show_gallery_counts')=='1') && (addon_installed('galleries')))
+			if ((addon_installed('galleries')) && (get_option('show_gallery_counts')=='1'))
 			{
 				$num_galleries=$GLOBALS['SITE_DB']->query('SELECT COUNT(*) AS cnt FROM '.$GLOBALS['SITE_DB']->get_table_prefix().'galleries WHERE name LIKE \''.db_encode_like('member_'.strval($member_id).'_%').'\'');
 			}
@@ -415,7 +427,10 @@ class Hook_search_ocf_members
 			);
 			foreach ($fields as $key=>$val)
 			{
-				if ($val['RAW']!='') $_lines[$key]=$val['RENDERED'];
+				if (((is_string($val['RAW'])) && ($val['RAW']!='')) || ((is_object($val['RAW'])) && (!$val['RAW']->is_empty())))
+				{
+					$_lines[$key]=$val['RENDERED'];
+				}
 			}
 			if ((!$preview) && (addon_installed('ocf_contactmember')) && (has_actual_page_access(get_member(),'contactmember')))
 			{

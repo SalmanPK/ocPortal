@@ -43,7 +43,7 @@
 <tr class="field_input">
 	<td class="{+START,IF,{REQUIRED}} required{+END} form_table_huge_field"{+START,IF,{$NOT,{$MOBILE}}} colspan="2"{+END}>
 		{+START,IF_PASSED,DEFAULT_PARSED}
-			<textarea cols="1" rows="1" style="display: none" readonly="readonly" name="{NAME*}_parsed">{DEFAULT_PARSED*}</textarea>
+			<textarea cols="1" rows="1" style="display: none" readonly="readonly" disabled="disabled" name="{NAME*}_parsed">{DEFAULT_PARSED*}</textarea>
 		{+END}
 
 		<div class="float_surrounder">
@@ -70,7 +70,14 @@
 
 				{+START,IF,{$IN_STR,{CLASS},wysiwyg}}
 					<script type="text/javascript">// <![CDATA[
-						if ((window.wysiwyg_on) && (wysiwyg_on())) document.getElementById('{NAME;*}').readOnly=true; /* Stop typing while it loads */
+						if ((window.wysiwyg_on) && (wysiwyg_on()))
+						{
+							document.getElementById('{NAME;*}').readOnly=true; // Stop typing while it loads
+							window.setTimeout(function() {
+								if (document.getElementById('{NAME;*}').value==document.getElementById('{NAME;*}').defaultValue)
+									document.getElementById('{NAME;*}').readOnly=false; // Too slow, maybe WYSIWYG failed due to some network issue
+							},3000);
+						}
 
 						{+START,IF_PASSED,WORD_COUNTER}
 							add_event_listener_abstract(window,'load',function () {
@@ -132,7 +139,7 @@
 			<input type="hidden" name="posting_ref_id" value="{$RAND,1,2147483646}" />
 
 			<script type="text/javascript">// <![CDATA[
-				initialise_dragdrop_upload('container_for_{NAME*;}','{NAME*;}');
+				initialise_dragdrop_upload('container_for_{NAME;/}','{NAME;/}');
 			//]]></script>
 		</td>
 	</tr>

@@ -204,7 +204,7 @@ class Module_admin_flagrant extends standard_aed_module
 			$activation_time=$row['activation_time'];
 			$days=is_null($activation_time)?'':float_format(round((time()-$activation_time)/60/60/24,3));
 
-			$fields->attach(results_entry(array(protect_from_escaping(get_translated_tempcode($row['the_message'])),integer_format($row['days']),get_timezoned_date($row['order_time']),($row['active_now']==1)?$days:do_lang_tempcode('NA_EM'),$username,protect_from_escaping(hyperlink($edit_link,do_lang_tempcode('EDIT'),false,true,'#'.strval($row['id']))))),true);
+			$fields->attach(results_entry(array(protect_from_escaping(get_translated_tempcode($row['the_message'])),integer_format($row['days']),get_timezoned_date($row['order_time']),($row['active_now']==1)?$days:do_lang_tempcode('NA_EM'),$username,protect_from_escaping(hyperlink($edit_link,do_lang_tempcode('EDIT'),false,true,'#'.strval($row['id'])))),true));
 		}
 
 		return array(results_table(do_lang($this->menu_label),get_param_integer('start',0),'start',either_param_integer('max',20),'max',$max_rows,$header_row,$fields,$sortables,$sortable,$sort_order),false);
@@ -219,7 +219,7 @@ class Module_admin_flagrant extends standard_aed_module
 	 * @param  BINARY			Whether the message is for immediate use
 	 * @return tempcode		The tempcode for the fields
 	 */
-	function get_form_fields($message='',$days=1,$notes='',$validated=0)
+	function get_form_fields($message='',$days=1,$notes='',$validated=1)
 	{
 		$fields=new ocp_tempcode();
 		require_code('form_templates');
@@ -227,7 +227,7 @@ class Module_admin_flagrant extends standard_aed_module
 		$fields->attach(form_input_integer(do_lang_tempcode('NUMBER_DAYS'),do_lang_tempcode('NUMBER_DAYS_DESCRIPTION'),'days',$days,true));
 		if (get_value('disable_staff_notes')!=='1')
 			$fields->attach(form_input_text(do_lang_tempcode('NOTES'),do_lang_tempcode('DESCRIPTION_NOTES'),'notes',$notes,false));
-		$fields->attach(form_input_tick(do_lang_tempcode('IMMEDIATE_USE'),do_lang_tempcode('DESCRIPTION_IMMEDIATE_USE'),'validated',$validated==1));
+		$fields->attach(form_input_tick(do_lang_tempcode('IMMEDIATE_USE'),do_lang_tempcode(($message=='')?'DESCRIPTION_IMMEDIATE_USE_ADD':'DESCRIPTION_IMMEDIATE_USE'),'validated',$validated==1));
 		return $fields;
 	}
 

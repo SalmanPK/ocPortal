@@ -1326,6 +1326,7 @@ class forum_driver_ocf extends forum_driver_base
 			}
 		} else
 		{
+			$rows=array();
 			$rows[0]=$this->get_member_row($userid);
 		}
 
@@ -1421,7 +1422,7 @@ class forum_driver_ocf extends forum_driver_base
 				case '': // ocPortal style salted MD5 algorithm
 					if ($cookie_login)
 					{
-						if ($password_hashed!=$row['m_pass_hash_salted'])
+						if ($password_hashed!==$row['m_pass_hash_salted'])
 						{
 							require_code('tempcode'); // This can be incidental even in fast AJAX scripts, if an old invalid cookie is present, so we need tempcode for do_lang_tempcode
 							$out['error']=do_lang_tempcode('USER_BAD_PASSWORD');
@@ -1429,7 +1430,7 @@ class forum_driver_ocf extends forum_driver_base
 						}
 					} else
 					{
-						if (md5($row['m_pass_salt'].$password_hashed)!=$row['m_pass_hash_salted'])
+						if (md5($row['m_pass_salt'].$password_hashed)!==$row['m_pass_hash_salted'])
 						{
 							$out['error']=do_lang_tempcode('USER_BAD_PASSWORD');
 							return $out;
@@ -1437,14 +1438,14 @@ class forum_driver_ocf extends forum_driver_base
 					}
 					break;
 				case 'plain':
-					if ($password_hashed!=md5($row['m_pass_hash_salted']))
+					if ($password_hashed!==md5($row['m_pass_hash_salted']))
 					{
 						$out['error']=do_lang_tempcode('USER_BAD_PASSWORD');
 						return $out;
 					}
 					break;
 				case 'md5': // Old style plain md5		(also works if both are unhashed: used for LDAP)
-					if (($password_hashed!=$row['m_pass_hash_salted']) && ($password_hashed!='!!!')) // The !!! bit would never be in a hash, but for plain text checks using this same code, we sometimes use '!!!' to mean 'Error'.
+					if (($password_hashed!==$row['m_pass_hash_salted']) && ($password_hashed!=='!!!')) // The !!! bit would never be in a hash, but for plain text checks using this same code, we sometimes use '!!!' to mean 'Error'.
 					{
 						$out['error']=do_lang_tempcode('USER_BAD_PASSWORD');
 						return $out;
@@ -1499,6 +1500,7 @@ class forum_driver_ocf extends forum_driver_base
 					$this->connection->query_insert('f_member_known_login_ips',array('i_val_code'=>$code,'i_member_id'=>$row['id'],'i_ip'=>$ip));
 					$url=find_script('validateip').'?code='.$code;
 					$url_simple=find_script('validateip');
+                    require_code('comcode');
 					$mail=do_lang('IP_VERIFY_MAIL',comcode_escape($url),comcode_escape(get_ip_address()),array($url_simple,$code),get_lang($row['id']));
 					$email_address=$row['m_email_address'];
 					if ($email_address=='') $email_address=get_option('staff_address');

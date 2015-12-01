@@ -150,6 +150,8 @@ class Module_admin_zones
 
 		$title=get_screen_title('_ZONE_EDITOR',true,array(escape_html($nice_zone_name)));
 
+		breadcrumb_set_parents(array(array('_SELF:_SELF:misc',do_lang_tempcode('ZONES')),array('_SELF:_SELF:editor',do_lang_tempcode('CHOOSE'))));
+
 		$lang=choose_language($title,true);
 		if (is_object($lang)) return $lang;
 
@@ -314,6 +316,8 @@ class Module_admin_zones
 						$_preview.=do_lang('BROKEN_XHTML_FIXED');
 					}
 				}
+
+				if ($GLOBALS['XSS_DETECT']) ocp_mark_as_escaped($_preview);
 			} else $_preview=NULL;
 
 			$is_panel=(substr($for,0,6)=='panel_');
@@ -324,7 +328,6 @@ class Module_admin_zones
 			$editor[$for]=static_evaluate_tempcode(do_template('ZONE_EDITOR_PANEL',array('_GUID'=>'f32ac84fe18b90497acd4afa27698bf0','DEFAULT_PARSED'=>$default_parsed,'CLASS'=>$class,'CURRENT_ZONE'=>$current_zone,'ZONES'=>$zone_list,'COMCODE'=>$comcode,'PREVIEW'=>$_preview,'ZONE'=>$id,'ID'=>$for,'IS_PANEL'=>$is_panel,'TYPE'=>$type,'EDIT_URL'=>$edit_url,'SETTINGS'=>$settings,'COMCODE_EDITOR'=>$comcode_editor)));
 		}
 
-		breadcrumb_set_parents(array(array('_SELF:_SELF:editor',do_lang_tempcode('CHOOSE'))));
 		breadcrumb_set_self($nice_zone_name);
 
 		list($warning_details,$ping_url)=handle_conflict_resolution($id);
@@ -461,9 +464,12 @@ class Module_admin_zones
 
 		$javascript="
 			var zone=document.getElementById('zone');
-			zone.onblur=function() {
-				var title=document.getElementById('title');
-				if (title.value=='') title.value=zone.value.substr(0,1).toUpperCase()+zone.value.substring(1,zone.value.length).replace(/\_/g,' ');
+			if (zone)
+			{
+				zone.onblur=function() {
+					var title=document.getElementById('title');
+					if (title.value=='') title.value=zone.value.substr(0,1).toUpperCase()+zone.value.substring(1,zone.value.length).replace(/\_/g,' ');
+				}
 			}
 		";
 
@@ -539,7 +545,6 @@ class Module_admin_zones
 				$fields.=static_evaluate_tempcode(form_input_tick(do_lang_tempcode('ACCESS_FOR',escape_html($name)),do_lang_tempcode('DESCRIPTION_ACCESS_FOR',escape_html($name)),'access_'.strval($id),!is_null($perhaps)));
 			}
 		}
-
 		return array(make_string_tempcode($fields),$hidden,$javascript);
 	}
 
@@ -689,7 +694,7 @@ class Module_admin_zones
 				($remaining_row['zone_wide']==1)?do_lang_tempcode('YES'):do_lang_tempcode('NO'),
 				($remaining_row['zone_require_session']==1)?do_lang_tempcode('YES'):do_lang_tempcode('NO'),
 				protect_from_escaping(hyperlink($edit_link,do_lang_tempcode('EDIT'),false,true,$zone_name)),
-			)),true);
+			),true));
 		}
 
 		$table=results_table(do_lang('ZONES'),get_param_integer('start',0),'start',either_param_integer('max',20),'max',$max_rows,$header_row,$fields,$sortables,$sortable,$sort_order);

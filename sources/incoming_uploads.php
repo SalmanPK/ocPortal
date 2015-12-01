@@ -153,7 +153,7 @@ function incoming_uploads_script()
 		$outa['upload_id']=strval($file_db_id);
 		$outa['upload_name']=$name;
 		$outa['upload_savename']=$savename;
-		@ini_set('ocproducts.xss_detect','0');
+		safe_ini_set('ocproducts.xss_detect','0');
 		$outstr='{';
 		$done=0;
 		foreach ($outa as $key=>$val) // Put out data as JSON
@@ -174,7 +174,7 @@ function incoming_uploads_script()
 		echo $outstr;
 	} else
 	{
-		//header('Content-type: text/plain'); @print('No file ('.serialize($_FILES).')');
+		//header('Content-type: text/plain; charset='.get_charset()); @print('No file ('.serialize($_FILES).')');
 		header('HTTP/1.1 500 File Upload Error');
 
 		// Test harness

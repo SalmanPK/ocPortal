@@ -353,7 +353,8 @@ function wysiwyg_editor_init_for(element)
 			info.get('txtCellPad')['default']='0';
 		}
 	});
-	window.lang_PREFER_OCP_ATTACHMENTS='{!javascript:PREFER_OCP_ATTACHMENTS;}';
+	if (document.getElementById('attachment_store'))
+		window.lang_PREFER_OCP_ATTACHMENTS='{!javascript:PREFER_OCP_ATTACHMENTS;}';
 
 	/*window.setTimeout( function() {
 		window.scrollTo(0,0); // Otherwise jumps to last editor
@@ -491,6 +492,7 @@ function find_tags_in_editor(editor,element)
 					{
 						tag_text=get_inner_html(this);
 					}
+
 					//if (tag_text.match(/^\[.*\]$/))
 					{
 						this.style.cursor='pointer';
@@ -514,7 +516,7 @@ function find_tags_in_editor(editor,element)
 								var request=do_ajax_request(url,function(ajax_result_frame,ajax_result) {
 									if (ajax_result)
 									{
-										var tmp_rendered=get_inner_html(ajax_result);
+										var tmp_rendered=merge_text_nodes(ajax_result.childNodes);
 										if (tmp_rendered.indexOf('{!CCP_ERROR_STUB;}')==-1)
 											self_ob.rendered_tooltip=tmp_rendered;
 									}

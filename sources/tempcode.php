@@ -49,7 +49,7 @@ function init__tempcode()
 	global $XHTML_SPIT_OUT,$NO_EVAL_CACHE,$MEMORY_OVER_SPEED,$CACHED_FOUND,$REQUEST_BLOCK_NEST_LEVEL,$LOADED_TPL_CACHE;
 	$XHTML_SPIT_OUT=NULL;
 	$NO_EVAL_CACHE=false;
-	$MEMORY_OVER_SPEED=false;
+	$MEMORY_OVER_SPEED=(get_param_integer('keep_memory_over_speed',0)==1);
 	$CACHED_FOUND=array();
 	$REQUEST_BLOCK_NEST_LEVEL=0;
 	$LOADED_TPL_CACHE=array();
@@ -616,9 +616,9 @@ function do_template($codename,$parameters=NULL,$lang=NULL,$light_error=false,$f
 		if ($KEEP_MARKERS)
 		{
 			$__data=new ocp_tempcode();
-			$__data->attach('<!-- START-TEMPLATE='.$codename.' -->');
+			$__data->attach('<!-- START-TEMPLATE='.escape_html($codename).' -->');
 			$__data->attach($ret);
-			$__data->attach('<!-- END-TEMPLATE='.$codename.' -->');
+			$__data->attach('<!-- END-TEMPLATE='.escape_html($codename).' -->');
 			$ret=$__data;
 		}
 		if (($SHOW_EDIT_LINKS) && ($codename!='PARAM_INFO'))
@@ -714,14 +714,6 @@ function handle_symbol_preprocessing($bit,&$children)
 		case 'BLOCK':
 			$param=$bit[3];
 
-			global $REQUEST_BLOCK_NEST_LEVEL;
-			$REQUEST_BLOCK_NEST_LEVEL++;
-			if ($REQUEST_BLOCK_NEST_LEVEL>40) // 100 caused xdebug error, but ocPortal will have some overhead in both error handler and other code to get to here. We want xdebug error to not show, but of course to provide the same benefits as that error.
-			{
-				$REQUEST_BLOCK_NEST_LEVEL=0;
-				warn_exit(do_lang_tempcode('STOPPED_RECURSIVE_RESOURCE_INCLUDE'));
-			}
-
 			foreach ($param as $i=>$p)
 				if (is_object($p)) $param[$i]=$p->evaluate();
 
@@ -736,10 +728,21 @@ function handle_symbol_preprocessing($bit,&$children)
 
 			//if (strpos(serialize($param),'side_stored_menu')!==false) { @debug_print_backtrace();exit(); } // Useful for debugging
 
+			global $REQUEST_BLOCK_NEST_LEVEL;
+
 			global $LOADED_BLOCKS;
 			if (isset($LOADED_BLOCKS[serialize($param)]))
 			{
 				$REQUEST_BLOCK_NEST_LEVEL--;
+				return;
+			}
+
+			$REQUEST_BLOCK_NEST_LEVEL++;
+			if ($REQUEST_BLOCK_NEST_LEVEL>20)
+			{
+				$REQUEST_BLOCK_NEST_LEVEL=0;
+				$LOADED_BLOCKS[serialize($param)]=do_lang_tempcode('INTERNAL_ERROR');
+				attach_message(do_lang_tempcode('STOPPED_RECURSIVE_RESOURCE_INCLUDE',is_string($param[0])?$param[0]:'block'),'warn');
 				return;
 			}
 
@@ -1198,7 +1201,7 @@ class ocp_tempcode
 		if ($XSS_DETECT)
 		{
 			$before=@ini_get('ocproducts.xss_detect');
-			@ini_set('ocproducts.xss_detect','0');
+			safe_ini_set('ocproducts.xss_detect','0');
 		}
 
 		$no_eval_cache_before=$NO_EVAL_CACHE;
@@ -1250,7 +1253,7 @@ class ocp_tempcode
 				if (!$no_eval_cache_before)
 					$NO_EVAL_CACHE=$no_eval_cache_before;
 				if ($XSS_DETECT)
-					@ini_set('ocproducts.xss_detect',$before);
+					safe_ini_set('ocproducts.xss_detect',$before);
 				$this->is_really_empty=false;
 				return false;
 			}
@@ -1272,7 +1275,7 @@ class ocp_tempcode
 				@ob_end_clean();
 			}
 			if ($XSS_DETECT)
-				@ini_set('ocproducts.xss_detect',$before);
+				safe_ini_set('ocproducts.xss_detect',$before);
 			if (!$no_eval_cache_before)
 				$NO_EVAL_CACHE=$no_eval_cache_before;
 			$ret=($tmp=='');
@@ -1291,7 +1294,7 @@ class ocp_tempcode
 		if (!$no_eval_cache_before)
 			$NO_EVAL_CACHE=$no_eval_cache_before;
 		if ($XSS_DETECT)
-			@ini_set('ocproducts.xss_detect',$before);
+			safe_ini_set('ocproducts.xss_detect',$before);
 		$ret=($this->cached_output=='');
 		$this->is_really_empty=$ret;
 		return $ret;
@@ -1619,7 +1622,7 @@ class ocp_tempcode
 		if ($XSS_DETECT)
 		{
 			$before=@ini_get('ocproducts.xss_detect');
-			@ini_set('ocproducts.xss_detect','0');
+			safe_ini_set('ocproducts.xss_detect','0');
 		}
 
 		if ($current_lang===NULL)
@@ -1657,7 +1660,7 @@ class ocp_tempcode
 				}
 
 				if ($XSS_DETECT)
-					@ini_set('ocproducts.xss_detect',$before);
+					safe_ini_set('ocproducts.xss_detect',$before);
 				return $ret;
 			}
 
@@ -1700,7 +1703,7 @@ class ocp_tempcode
 		}
 
 		if ($XSS_DETECT)
-			@ini_set('ocproducts.xss_detect',$before);
+			safe_ini_set('ocproducts.xss_detect',$before);
 
 		//$tempcode_profile_log_end=microtime();
 		//tempcode_profile_log_diff($tempcode_profile_log_start,$tempcode_profile_log_end,$this->seq_parts);

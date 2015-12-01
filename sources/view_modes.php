@@ -109,7 +109,7 @@ function special_page_types($special_page_type,&$out,/*&*/$out_evaluated)
 	if (substr($special_page_type,-4)=='.css')
 	{
 		$url=build_url(array('page'=>'admin_themes','type'=>'edit_css','theme'=>$GLOBALS['FORUM_DRIVER']->get_theme(),'file'=>$special_page_type,'keep_wide_high'=>1),get_module_zone('admin_themes'));
-		header('Location: '.$url->evaluate());
+		header('Location: '.str_replace(chr(13),'',str_replace(chr(10),'',$url->evaluate())));
 		exit();
 	}
 
@@ -117,7 +117,7 @@ function special_page_types($special_page_type,&$out,/*&*/$out_evaluated)
 	if ($special_page_type=='site_tree')
 	{
 		$url=build_url(array('page'=>'admin_sitetree','type'=>'site_tree','id'=>get_zone_name().':'.get_page_name()),get_module_zone('admin_sitetree'));
-		header('Location: '.$url->evaluate());
+		header('Location: '.str_replace(chr(13),'',str_replace(chr(10),'',$url->evaluate())));
 		exit();
 	}
 
@@ -259,7 +259,7 @@ function special_page_types($special_page_type,&$out,/*&*/$out_evaluated)
 			}
 		}
 		if ($fields->is_empty()) inform_exit(do_lang_tempcode('NOTHING_TO_TRANSLATE'));
-		$title=get_screen_title('__TRANSLATE_CONTENT',true,array($lang_name));
+		$title=get_screen_title('__TRANSLATE_CONTENT',true,array(escape_html($lang_name)));
 		$post_url=build_url(array('page'=>'admin_lang','type'=>'_content','contextual'=>1),'adminzone');
 		$hidden=form_input_hidden('redirect',get_self_url(true,true));
 		$hidden=form_input_hidden('lang',user_lang());
@@ -301,7 +301,7 @@ function special_page_types($special_page_type,&$out,/*&*/$out_evaluated)
 				$fields->attach(form_input_text($key,$description,'l_'.$key,str_replace('\n',chr(10),$value_found),false));
 			}
 		}
-		$title=get_screen_title('__TRANSLATE_CODE',true,array($lang_name));
+		$title=get_screen_title('__TRANSLATE_CODE',true,array(escape_html($lang_name)));
 		$post_url=build_url(array('page'=>'admin_lang','type'=>'_code2'),'adminzone');
 		$hidden=form_input_hidden('redirect',get_self_url(true,true));
 		$hidden=form_input_hidden('lang',user_lang());

@@ -8,7 +8,7 @@
 */
 
 restrictify();
-@ini_set('ocproducts.xss_detect','0');
+safe_ini_set('ocproducts.xss_detect','0');
 
 define('SOLUTION_FORUM',283); // The forum ID on ocPortal.com for problem solution posts
 
@@ -128,7 +128,7 @@ if (strtoupper($_SERVER['REQUEST_METHOD'])=='POST')
 	// Make tracker comment with fix link
 	$tracker_comment_message='';
 	if ($git_commit_id!==NULL)
-		$tracker_comment_message.='Fixed in git commit '.escape_html($git_commit_id).' ('.escape_html($git_url).' - link will become active once code pushed)'."\n\n";
+		$tracker_comment_message.='Fixed in git commit '.escape_html($git_commit_id).' ('.escape_html($git_url).' - link will become active once code pushed to github)'."\n\n";
 	$tracker_comment_message.='A hotfix (a TAR of files to upload) have been uploaded to this issue. These files are made to the latest intra-version state (i.e. may roll in earlier fixes too if made to the same files) - so only upload files newer than what you have already. Always take backups of files you are replacing or keep a copy of the manual installer for your version, and only apply fixes you need. These hotfixes are not necessarily reliable or well supported. Not sure how to extract TAR files to your Windows computer? Try 7-zip (http://www.7-zip.org/).';
 	create_tracker_post($tracker_id,$tracker_comment_message);
 	// A tar of fixed files is uploaded to the tracker issue (correct relative file paths intact)
@@ -295,7 +295,7 @@ echo <<<END
 
 		<div>
 			<label for="tracker_id">Tracker ID to attach to <span style="font-size: 0.8em">(if not entered a new one will be made)</span></label>
-			<input onchange="this.form.elements['post_to_bug_catalogue'].checked=false;" name="tracker_id" id="tracker_id" type="number" value="" placeholder="optional" />
+			<input name="tracker_id" id="tracker_id" type="number" value="" placeholder="optional" />
 		</div>
 
 		<div>
@@ -511,6 +511,7 @@ function make_call($call,$params,$file=NULL)
 				<input type="submit" value="Action failed: Try manually" />
 			</form>
 		';
+        $result='';
 	}
 	if ($result=='Access Denied')
 	{

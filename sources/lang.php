@@ -75,6 +75,8 @@ function init__lang()
 	$REQUIRE_LANG_LOOP=0;
 	global $REQUIRED_ALL_LANG;
 	$REQUIRED_ALL_LANG=array();
+	global $NEEDS_PAGE_CACHE_RESAVE;
+	$NEEDS_PAGE_CACHE_RESAVE=false;
 
 	// Lazy loading code: learning algorithm to cache strings against different pages without loading all, unless we get a cache miss in the page's pool
 	global $PAGE_CACHE_FILE,$PAGE_CACHE_LANG_LOADED,$PAGE_CACHE_LAZY_LOAD,$PAGE_CACHE_LANGS_REQUESTED;
@@ -477,6 +479,8 @@ function require_lang($codename,$lang=NULL,$type=NULL,$ignore_errors=false) // $
 			@flock($PAGE_CACHE_FILE,LOCK_EX);
 			@ftruncate($PAGE_CACHE_FILE,0);
 			@flock($PAGE_CACHE_FILE,LOCK_UN);
+			global $PAGE_CACHE_LANG_LOADED;
+			$PAGE_CACHE_LANG_LOADED=array(); // This will no longer be valid, as one of the files that came into it has changed
 			$PAGE_CACHE_LAZY_LOAD=false;
 			$LANG_LOADED_LANG=array();
 			$PAGE_CACHE_LANGS_REQUESTED[]=array($codename,$lang);
@@ -812,7 +816,9 @@ function _do_lang($codename,$token1=NULL,$token2=NULL,$token3=NULL,$lang=NULL,$r
 					$PAGE_CACHE_LANG_LOADED[$lang][$codename]=NULL;
 					if ($GLOBALS['MEM_CACHE']!==NULL)
 					{
-						persistent_cache_set($PAGE_CACHE_FILE,$PAGE_CACHE_LANG_LOADED);
+						global $NEEDS_PAGE_CACHE_RESAVE;
+						if (!$NEEDS_PAGE_CACHE_RESAVE) register_shutdown_function('_page_cache_resave');
+						$NEEDS_PAGE_CACHE_RESAVE=true;
 					} else
 					{
 						open_page_cache_file();
@@ -845,7 +851,9 @@ function _do_lang($codename,$token1=NULL,$token2=NULL,$token3=NULL,$lang=NULL,$r
 					$PAGE_CACHE_LANG_LOADED[$lang][$codename]=$PAGE_CACHE_LANG_LOADED[fallback_lang()][$codename]; // Will have been cached into fallback_lang() from the nested do_lang call, we need to copy it into our cache bucket for this language
 					if ($GLOBALS['MEM_CACHE']!==NULL)
 					{
-						persistent_cache_set($PAGE_CACHE_FILE,$PAGE_CACHE_LANG_LOADED);
+						global $NEEDS_PAGE_CACHE_RESAVE;
+						if (!$NEEDS_PAGE_CACHE_RESAVE) register_shutdown_function('_page_cache_resave');
+						$NEEDS_PAGE_CACHE_RESAVE=true;
 					} else
 					{
 						open_page_cache_file();
@@ -886,7 +894,9 @@ function _do_lang($codename,$token1=NULL,$token2=NULL,$token3=NULL,$lang=NULL,$r
 			$PAGE_CACHE_LANG_LOADED[$lang][$codename]=$LANGUAGE[$lang][$codename];
 			if ($GLOBALS['MEM_CACHE']!==NULL)
 			{
-				persistent_cache_set($PAGE_CACHE_FILE,$PAGE_CACHE_LANG_LOADED);
+				global $NEEDS_PAGE_CACHE_RESAVE;
+				if (!$NEEDS_PAGE_CACHE_RESAVE) register_shutdown_function('_page_cache_resave');
+				$NEEDS_PAGE_CACHE_RESAVE=true;
 			} else
 			{
 				open_page_cache_file();
@@ -987,6 +997,15 @@ function _do_lang($codename,$token1=NULL,$token2=NULL,$token3=NULL,$lang=NULL,$r
 		}
 	}
 	return $out;
+}
+
+/**
+ * Re-save language learning cache into persistent cache
+ */
+function _page_cache_resave()
+{
+	global $PAGE_CACHE_FILE,$PAGE_CACHE_LANG_LOADED;
+	persistent_cache_set($PAGE_CACHE_FILE,$PAGE_CACHE_LANG_LOADED);
 }
 
 /**
@@ -1337,6 +1356,8 @@ function choose_language($title,$tip=false,$allow_all_selection=false)
 
 	$hidden=build_keep_post_fields();
 	$url=get_self_url();
+
+	breadcrumb_set_self(do_lang_tempcode('LANGUAGE'));
 
 	return do_template('FORM_SCREEN',array('_GUID'=>'1a2823d450237aa299c095bf9c689a2a','SKIP_VALIDATION'=>true,'HIDDEN'=>$hidden,'SUBMIT_NAME'=>do_lang_tempcode('PROCEED'),'TITLE'=>$title,'FIELDS'=>$fields,'URL'=>$url,'TEXT'=>$text));
 }

@@ -160,7 +160,7 @@ function comcode_to_clean_text($message_plain)
 		require_code('comcode_from_html');
 		$message_plain=str_replace($match[0],semihtml_to_comcode($match[0],true),$message_plain);
 	}
-	if (preg_match("#\[html\](.*)\[\/html\]#Us",$message_plain,$match)!=0)
+	if (preg_match("#^\s*\[html\](.*)\[\/html\]\s*$#Us",$message_plain,$match)!=0)
 	{
 		require_code('comcode_from_html');
 		$message_plain=str_replace($match[0],semihtml_to_comcode($match[0],true),$message_plain);
@@ -245,7 +245,7 @@ function mail_wrap($subject_line,$message_raw,$to_email=NULL,$to_name=NULL,$from
 
 	if (is_null($bypass_queue))
 	{
-		$bypass_queue=($priority<3);
+		$bypass_queue=(($priority<3) || (strpos(serialize($attachments),'tmpfile')!==false));
 	}
 
 	global $EMAIL_ATTACHMENTS;
@@ -261,7 +261,7 @@ function mail_wrap($subject_line,$message_raw,$to_email=NULL,$to_name=NULL,$from
 		if ((mt_rand(0,100)==1) && (!$GLOBALS['SITE_DB']->table_is_locked('logged_mail_messages')))
 			$GLOBALS['SITE_DB']->query('DELETE FROM '.get_table_prefix().'logged_mail_messages WHERE m_date_and_time<'.strval(time()-60*60*24*14).' AND m_queued=0'); // Log it all for 2 weeks, then delete
 
-		$through_queue=(!$bypass_queue) && ((get_option('mail_queue')==='1') || ((get_option('mail_queue_debug')==='1') && (cron_installed())));
+		$through_queue=(!$bypass_queue) && ((get_option('mail_queue_debug')==='1') || ((get_option('mail_queue')==='1') && (cron_installed())));
 
 		$GLOBALS['SITE_DB']->query_insert('logged_mail_messages',array(
 			'm_subject'=>substr($subject_line,0,255),
@@ -459,6 +459,7 @@ function mail_wrap($subject_line,$message_raw,$to_email=NULL,$to_name=NULL,$from
 	$headers.='X-Sender: <'.$website_email.'>'.$line_term;
 	$cc_address=$no_cc?'':get_option('cc_address');
 	if (($cc_address!='') && (!in_array($cc_address,$to_email))) $headers.=((get_option('bcc')=='1')?'Bcc: <':'Cc: <').$cc_address.'>'.$line_term;
+	$headers.='Date: '.date('r',time()).$line_term;
 	$headers.='Message-ID: <'.$_boundary.'@'.get_domain().'>'.$line_term;
 	$headers.='X-Priority: '.strval($priority).$line_term;
 	$brand_name=get_value('rebrand_name');
@@ -802,12 +803,14 @@ function mail_wrap($subject_line,$message_raw,$to_email=NULL,$to_name=NULL,$from
  * Whilst this is a clever algorithm, it isn't so clever as to actually try and match each selector against a DOM tree. If any segment of a compound selector matches, match is assumed.
  *
  * @param  ID_TEXT		CSS file
- * @param  ID_TEXT		Theme
+ * @param  ?ID_TEXT		Theme (NULL: default)
  * @param  string			(X)HTML context under which CSS is filtered
  * @return string			Filtered CSS
  */
 function filter_css($c,$theme,$context)
 {
+	if (is_null($theme)) $theme=$GLOBALS['FORUM_DRIVER']->get_theme();
+
 	// Reduce input parameters to critical components, and cache on - saves a lot of time if multiple emails sent by script
 	static $cache=array();
 	$simple_sig=preg_replace('#\s+(?!class)(?!id)[\w\-]+="[^"<>]*"#','',preg_replace('#[^<>]*(<[^<>]+>)[^<>]*#s','${1}',$context));
@@ -848,6 +851,10 @@ function filter_css($c,$theme,$context)
 	// Strip comments from CSS. This optimises, and also avoids us needing to do a sophisticated parse
 	$css=preg_replace('#/\*.*\*/#Us','',$css);
 
+	// Strip all media rules, we don't support parsing it, and e-mails will not be that complex
+	$middle_regexp='[^\{\}]*'.'\{[^\{\}]*\}'.'[^\{\}]*';
+	$css=preg_replace('#@media[^\{\}]*\{('.$middle_regexp.')*\}#s','',$css);
+
 	// Find and process each CSS selector block
 	$stack=array();
 	$css_new='';
@@ -873,7 +880,6 @@ function filter_css($c,$theme,$context)
 					{
 						$selector=trim($selector);
 
-						if (strpos($selector,'@media print')!==false) break;
 						if (strpos($selector,'::selection')!==false) continue;
 						if (strpos($selector,'a[href^="mailto:"]')!==false) continue;
 						if (strpos($selector,'a[target="_blank"]')!==false) continue;
@@ -977,7 +983,7 @@ function form_to_email($subject=NULL,$intro='',$fields=NULL,$to_email=NULL,$is_v
 	if (is_null($fields))
 	{
 		$fields=array();
-		foreach (array_diff(array_keys($_POST),array('MAX_FILE_SIZE','perform_validation','_validated','posting_ref_id','f_face','f_colour','f_size','x','y','name','subject','email','to_members_email','to_written_name','redirect','http_referer')) as $key)
+		foreach (array_diff(array_keys($_POST),array('MAX_FILE_SIZE','perform_validation','_validated','posting_ref_id','f_face','f_colour','f_size','x','y','name','subject','email','to_members_email','to_written_name','redirect','http_referer',md5(get_site_name().': antispam'))) as $key)
 		{
 			$is_hidden=(strpos($key,'hour')!==false) || (strpos($key,'access_')!==false) || (strpos($key,'minute')!==false) || (strpos($key,'confirm')!==false) || (strpos($key,'pre_f_')!==false) || (strpos($key,'label_for__')!==false) || (strpos($key,'wysiwyg_version_of_')!==false) || (strpos($key,'is_wysiwyg')!==false) || (strpos($key,'require__')!==false) || (strpos($key,'tempcodecss__')!==false) || (strpos($key,'comcode__')!==false) || (strpos($key,'_parsed')!==false) || (substr($key,0,1)=='_') || (substr($key,0,9)=='hidFileID') || (substr($key,0,11)=='hidFileName');
 			if ($is_hidden) continue;
@@ -1038,6 +1044,6 @@ function form_to_email($subject=NULL,$intro='',$fields=NULL,$to_email=NULL,$is_v
 		}
 	}
 
-	mail_wrap($subject,$message_raw,array($to_email),$to_name,$from_email,$from_name,3,$attachments);
+	mail_wrap($subject,$message_raw,is_null($to_email)?NULL:array($to_email),$to_name,$from_email,$from_name,3,$attachments);
 }
 

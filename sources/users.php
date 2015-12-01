@@ -164,7 +164,7 @@ function get_member($quick_only=false)
 
 	// Try via backdoor that someone with full server access can place
 	$backdoor_ip_address=mixed(); // Enable to a real IP address to force login from FTP access (if lost admin password)
-	if (array_key_exists('backdoor_ip',$SITE_INFO)) $backdoor_ip_address=$SITE_INFO['backdoor_ip'];
+	if (!empty($SITE_INFO['backdoor_ip'])) $backdoor_ip_address=normalise_ip_address($SITE_INFO['backdoor_ip']);
 	if ((is_string($backdoor_ip_address)) && (get_ip_address()==$backdoor_ip_address))
 	{
 		require_code('users_active_actions');
@@ -260,8 +260,9 @@ function get_member($quick_only=false)
 	foreach (array_keys($hooks) as $hook)
 	{
 		require_code('hooks/systems/login_providers/'.$hook);
-		$ob=object_factory('Hook_login_provider_'.$hook);
-		$member=$ob->try_login($member);
+		$ob=object_factory('Hook_login_provider_'.$hook,true);
+		if (!is_null($ob))
+			$member=$ob->try_login($member);
 	}
 
 	// Guest or banned
@@ -412,7 +413,7 @@ function delete_expired_sessions_or_recover($member=NULL)
 			continue;
 		}
 
-		// Get back to prior session if there was one
+		// Get back to prior session if there was one (NB: we don't turn guest sessions into member sessions, as that would increase risk of there being a session fixation vulnerability)
 		if ($member!==NULL)
 		{
 			if (($row['the_user']==$member) && (((get_option('ip_strict_for_sessions')=='0') && ($member!=$GLOBALS['FORUM_DRIVER']->get_guest_id())) || ($row['ip']==$ip)) && ($row['last_activity']>time()-60*60*max(1,intval(get_option('session_expiry_time')))))
@@ -516,7 +517,15 @@ function get_ocp_cpf($cpf,$member=NULL)
 	if (get_forum_type()=='ocf')
 	{
 		$values=ocf_get_all_custom_fields_match_member($member);
-		if (array_key_exists($cpf,$values)) return $values[$cpf]['RAW'];
+		if (array_key_exists($cpf,$values))
+		{
+			$ret=$values[$cpf]['RAW'];
+			if (is_object($ret))
+			{
+				$ret=$ret->evaluate();
+			}
+			return $ret;
+		}
 	}
 
 	return '';

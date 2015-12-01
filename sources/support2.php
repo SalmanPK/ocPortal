@@ -40,7 +40,13 @@ function get_members_viewing_wrap($page=NULL,$type=NULL,$id=NULL,$forum_layer=fa
 		$members_viewing=new ocp_tempcode();
 		if (!isset($members[get_member()]))
 		{
-			$members[get_member()]=array('mt_cache_username'=>$GLOBALS['FORUM_DRIVER']->get_username(get_member()));
+			if (is_guest())
+			{
+				$members[get_member()]=1;
+			} else
+			{
+				$members[get_member()]=array('mt_cache_username'=>$GLOBALS['FORUM_DRIVER']->get_username(get_member()));
+			}
 		}
 		foreach ($members as $member_id=>$at_details)
 		{
@@ -48,7 +54,7 @@ function get_members_viewing_wrap($page=NULL,$type=NULL,$id=NULL,$forum_layer=fa
 
 			if (is_guest($member_id))
 			{
-				$num_guests++;
+				$num_guests+=$at_details/*is integer for guest*/;
 			} else
 			{
 				$num_members++;
@@ -75,15 +81,16 @@ function get_members_viewing_wrap($page=NULL,$type=NULL,$id=NULL,$forum_layer=fa
  * Convert a string to an array, with utf-8 awareness where possible/required.
  *
  * @param  string			Input
+ * @param  boolean		Whether to force unicode as on.
  * @return array			Output
  */
-function ocp_mb_str_split($str)
+function ocp_mb_str_split($str,$force=false)
 {
-	$len=ocp_mb_strlen($str);
+	$len=ocp_mb_strlen($str,$force);
 	$array=array();
 	for ($i=0;$i<$len;$i++)
 	{
-		$array[]=ocp_mb_substr($str,$i,1);
+		$array[]=ocp_mb_substr($str,$i,1,$force);
 	}
 	return $array;
 }
@@ -94,12 +101,13 @@ function ocp_mb_str_split($str)
  * @param  string		The input string.
  * @param  integer	The maximum chunking length.
  * @param  string		Split character.
+ * @param  boolean	Whether to force unicode as on.
  * @return string		The chunked version of the input string.
  */
-function ocp_mb_chunk_split($str,$len=76,$glue="\r\n")
+function ocp_mb_chunk_split($str,$len=76,$glue="\r\n",$force=false)
 {
 	if ($str=='') return '';
-	$array=ocp_mb_str_split($str);
+	$array=ocp_mb_str_split($str,$force);
 	$n=-1;
 	$new='';
 	foreach ($array as $char)
@@ -292,8 +300,6 @@ function _log_it($type,$a=NULL,$b=NULL)
 {
 	if (!function_exists('get_member')) return; // If this is during installation
 
-	if ((get_option('site_closed')=='1') && (get_option('no_stats_when_closed',true)==='1')) return;
-
 	// Run hooks, if any exist
 	$hooks=find_all_hooks('systems','upon_action_logging');
 	foreach (array_keys($hooks) as $hook)
@@ -304,8 +310,11 @@ function _log_it($type,$a=NULL,$b=NULL)
 		$ob->run($type,$a,$b);
 	}
 
-	$ip=get_ip_address();
-	$GLOBALS['SITE_DB']->query_insert('adminlogs',array('the_type'=>$type,'param_a'=>is_null($a)?'':substr($a,0,80),'param_b'=>is_null($b)?'':substr($b,0,80),'date_and_time'=>time(),'the_user'=>get_member(),'ip'=>$ip));
+	if ((get_option('site_closed')=='0') || (get_option('no_stats_when_closed',true)!=='1'))
+	{
+		$ip=get_ip_address();
+		$GLOBALS['SITE_DB']->query_insert('adminlogs',array('the_type'=>$type,'param_a'=>is_null($a)?'':substr($a,0,80),'param_b'=>is_null($b)?'':substr($b,0,80),'date_and_time'=>time(),'the_user'=>get_member(),'ip'=>$ip));
+	}
 
 	decache('side_tag_cloud');
 	decache('main_staff_actions');

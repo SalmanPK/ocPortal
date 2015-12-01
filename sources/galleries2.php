@@ -522,8 +522,8 @@ function delete_image($id,$delete_full=true)
 
 	// Delete from database
 	$GLOBALS['SITE_DB']->query_delete('images',array('id'=>$id),'',1);
-	$GLOBALS['SITE_DB']->query_delete('rating',array('rating_for_type'=>'images','rating_for_id'=>$id));
-	$GLOBALS['SITE_DB']->query_delete('trackbacks',array('trackback_for_type'=>'images','trackback_for_id'=>$id));
+	$GLOBALS['SITE_DB']->query_delete('rating',array('rating_for_type'=>'images','rating_for_id'=>strval($id)));
+	$GLOBALS['SITE_DB']->query_delete('trackbacks',array('trackback_for_type'=>'images','trackback_for_id'=>strval($id)));
 	require_code('notifications');
 	delete_all_notifications_on('comment_posted','images_'.strval($id));
 
@@ -596,14 +596,19 @@ function create_video_thumb($src_url,$expected_output_path=NULL)
 			if ($movie->getFrameCount()==0) return '';
 
 			$frame=$movie->getFrame(min($movie->getFrameCount(),25));
-			$gd_img=$frame->toGDImage();
-
-			@imagejpeg($gd_img,$expected_output_path);
+			if (method_exists($frame,'toGDImage'))
+			{
+				$gd_img=$frame->toGDImage();
+				@imagejpeg($gd_img,$expected_output_path);
+			} else
+			{
+				$frame->save($expected_output_path); // New-style
+			}
 
 			if (file_exists($expected_output_path))
 			{
 				require_code('images');
-				if ((get_option('is_on_gd')=='1') && (function_exists('imagecreatefromstring')))
+				if ((get_option('is_on_gd')=='1') && (function_exists('imagepng')))
 					convert_image($expected_output_path,$expected_output_path,-1,-1,intval(get_option('thumb_width')),true,NULL,true);
 
 				return 'uploads/galleries/'.rawurlencode(basename($expected_output_path));
@@ -641,7 +646,7 @@ function create_video_thumb($src_url,$expected_output_path=NULL)
 		if (file_exists(str_replace('%d','1',$dest_file)))
 		{
 			require_code('images');
-			if ((get_option('is_on_gd')=='1') && (function_exists('imagecreatefromstring')))
+			if ((get_option('is_on_gd')=='1') && (function_exists('imagepng')))
 			{
 				convert_image(str_replace('%d','1',$dest_file),$expected_output_path,-1,-1,intval(get_option('thumb_width')),true,NULL,true);
 			} else
@@ -800,7 +805,7 @@ function edit_video($id,$title,$cat,$comments,$url,$thumb_url,$validated,$allow_
  */
 function delete_video($id,$delete_full=true)
 {
-	$rows=$GLOBALS['SITE_DB']->query_select('videos',array('title','comments','cat'),array('id'=>$id));
+	$rows=$GLOBALS['SITE_DB']->query_select('videos',array('title','comments','cat'),array('id'=>$id),'',1);
 	$title=$rows[0]['title'];
 	$comments=$rows[0]['comments'];
 	$cat=$rows[0]['cat'];
@@ -823,8 +828,8 @@ function delete_video($id,$delete_full=true)
 
 	// Delete from database
 	$GLOBALS['SITE_DB']->query_delete('videos',array('id'=>$id),'',1);
-	$GLOBALS['SITE_DB']->query_delete('rating',array('rating_for_type'=>'videos','rating_for_id'=>$id));
-	$GLOBALS['SITE_DB']->query_delete('trackbacks',array('trackback_for_type'=>'videos','trackback_for_id'=>$id));
+	$GLOBALS['SITE_DB']->query_delete('rating',array('rating_for_type'=>'videos','rating_for_id'=>strval($id)));
+	$GLOBALS['SITE_DB']->query_delete('trackbacks',array('trackback_for_type'=>'videos','trackback_for_id'=>strval($id)));
 	require_code('notifications');
 	delete_all_notifications_on('comment_posted','videos_'.strval($id));
 
@@ -846,7 +851,7 @@ function watermark_gallery_image($gallery,$file_path,$filename)
 {
 	// We can't watermark an image we can't save
 	require_code('images');
-	if (!function_exists('imagecreatefromstring')) return;
+	if (!function_exists('imagepng')) return;
 	if (!is_saveable_image($filename)) return;
 
 	// We need to find the most applicable gallery watermarks
@@ -881,8 +886,8 @@ function watermark_gallery_image($gallery,$file_path,$filename)
 	// Save
 	imagealphablending($source,false);
 	if (function_exists('imagesavealpha')) imagesavealpha($source,true);
-	if ($ext=='png') imagepng($source,$file_path);
-	elseif (($ext=='jpg') || ($ext=='jpeg')) imagejpeg($source,$file_path);
+	if ((function_exists('imagepng')) && ($ext=='png')) imagepng($source,$file_path);
+	elseif ((function_exists('imagejpeg')) && (($ext=='jpg') || ($ext=='jpeg'))) imagejpeg($source,$file_path);
 	elseif ((function_exists('imagegif')) && ($ext=='gif')) imagegif($source,$file_path);
 
 	// Clean up
@@ -926,7 +931,7 @@ function constrain_gallery_image_to_max_size($file_path,$filename,$box_width)
 	require_code('images');
 	if (!is_saveable_image($filename)) return;
 
-	if ((get_option('is_on_gd')=='1') && (function_exists('imagecreatefromstring')))
+	if ((get_option('is_on_gd')=='1') && (function_exists('imagepng')))
 		convert_image($file_path,$file_path,-1,-1,$box_width,false,get_file_extension($filename),true,true);
 }
 
@@ -1032,7 +1037,9 @@ function edit_gallery($old_name,$name,$fullname,$description,$teaser,$notes,$par
 	while (($under_category_id!='') && ($under_category_id!=STRING_MAGIC_NULL))
 	{
 		if ($name==$under_category_id) warn_exit(do_lang_tempcode('OWN_PARENT_ERROR'));
-		$under_category_id=$GLOBALS['SITE_DB']->query_value('galleries','parent_id',array('name'=>$under_category_id));
+		$_under_category_id=$GLOBALS['SITE_DB']->query_value('galleries','parent_id',array('name'=>$under_category_id));
+		if ($under_category_id==$_under_category_id) warn_exit(do_lang_tempcode('INTERNAL_ERROR'));
+		$under_category_id=$_under_category_id;
 	}
 
 	if (is_null($parent_id)) $parent_id='';

@@ -13,7 +13,7 @@
  * @package		code_quality
  */
 
-@ini_set('memory_limit','-1');
+ini_set('memory_limit','-1');
 error_reporting (E_ALL);
 set_time_limit(1000);
 global $OCPORTAL_PATH;
@@ -55,7 +55,8 @@ function parse_file($to_use,$verbose=false,$very_verbose=false,$i=NULL,$count=NU
 
 function cnl()
 {
-	return !isset($_SERVER['argv'])?'<br />':"\n";
+	$cli=(php_sapi_name()=='cli' && empty($_SERVER['REMOTE_ADDR']));
+	return $cli?"\n":'<br />';
 }
 
 function get_custom_file_base()

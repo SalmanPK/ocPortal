@@ -45,7 +45,7 @@ function open_link_as_overlay(ob,width,height,target)
 		var lightbox_code='<p class="ajax_tree_list_loading"><img id="lightbox_image" src="{$IMG*,loading}" /></p>';
 		var has_full_button=(typeof a.childNodes[0]=='undefined') || (a.href!==a.childNodes[0].src);
 		if (has_full_button)
-			lightbox_code+='<p class="associated_link associated_links_block_group"><a href="'+escape_html(a.href)+'" target="_blank" title="{$STRIP_TAGS;,{!SEE_FULL_IMAGE}} {!LINK_NEW_WINDOW}">{!SEE_FULL_IMAGE;}</a></p>';
+			lightbox_code+='<p class="associated_link associated_links_block_group"><a href="'+escape_html(a.href)+'" target="_blank" title="{$STRIP_TAGS;,{!SEE_FULL_IMAGE}} {!LINK_NEW_WINDOW;}">{!SEE_FULL_IMAGE;}</a></p>';
 
 		// Show overlay
 		var myLightbox={
@@ -417,8 +417,11 @@ function ModalWindow()
 
 			if (((boxHeight=='auto') && ('{$MOBILE}'==1)) || (height>dim.windowHeight))
 			{
-				this.box.childNodes[0].style.position='absolute';
-				this.box.childNodes[0].style.top='0';
+				if (!browser_matches('ios') && !browser_matches('android'))
+				{
+					this.box.childNodes[0].style.position='absolute';
+					this.box.childNodes[0].style.top='0';
+				} // iOS/Android uses static anyway
 
 				try
 				{
@@ -440,7 +443,7 @@ function ModalWindow()
 					'left': '0',
 					'top': '0',
 					'width': '100%',
-					'height': ((dim.pageHeight>dim.windowHeight)?dim.pageHeight:dim.windowHeight)+'px'
+					'height': (browser_matches('android') || browser_matches('ios'))?'auto':(((dim.pageHeight>dim.windowHeight)?dim.pageHeight:dim.windowHeight)+'px')
 				}
 			});
 
@@ -448,7 +451,8 @@ function ModalWindow()
 				'class': 'box overlay',
 				'role': 'dialog',
 				'styles' : {
-					'position': 'fixed'
+					'position': (browser_matches('android') || browser_matches('ios'))?'static':'fixed',
+					'margin': '0 auto' // Centering for iOS/Android which is statically positioned (so the container height as auto can work)
 				}
 			}));
 

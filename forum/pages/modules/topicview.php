@@ -109,22 +109,28 @@ class Module_topicview
 
 		$view_poll_results=get_param_integer('view_poll_results',0);
 
-		// Mark as read
-		if (!is_null($id))
-		{
-			$this->id=$id;
-			register_shutdown_function(array($this,'_update_read_status')); // done at end after output in case of locking (don't make the user wait)
-		}
-
 		// Load up topic info
 		$topic_info=ocf_read_in_topic($id,$start,$max,$view_poll_results==1);
 		$GLOBALS['META_DATA']+=$topic_info['meta_data'];
 		global $SEO_TITLE;
 		$SEO_TITLE=do_lang('_VIEW_TOPIC',$topic_info['title']);
 
+		// Mark as read
+		if (!is_null($id))
+		{
+			$this->id=$id;
+			if (is_null($topic_info['forum_id']))
+			{
+				$this->_update_read_status(); // Done early because we need to have updated read status set when the pt_notifications show up
+			} else
+			{
+				register_shutdown_function(array($this,'_update_read_status')); // done at end after output in case of locking (don't make the user wait)
+			}
+		}
+
 		// Render posts according to whether threaded or not
 		$threaded=($topic_info['is_threaded']==1);
-		$may_reply=(array_key_exists('may_reply',$topic_info)) && (($topic_info['is_open']) || (array_key_exists('may_post_closed',$topic_info)));
+		$may_reply=array_key_exists('may_reply',$topic_info);
 		if (!$threaded)
 		{
 			$GLOBALS['META_DATA']['description']=$topic_info['description'];
@@ -178,9 +184,9 @@ class Module_topicview
 					$buttons=ocf_render_post_buttons($topic_info,$_postdetails,$may_reply);
 				}
 
-				if (isset($poster_details_cache[$_postdetails['poster']])) // The cache avoids a lot of potentially duplicated Tempcode structure
+				if (isset($poster_details_cache[$_postdetails['poster']][$_postdetails['poster_username']])) // The cache avoids a lot of potentially duplicated Tempcode structure
 				{
-					list($post_avatar,$rank_images,$poster_details,$poster,$signature)=$poster_details_cache[$_postdetails['poster']];
+					list($post_avatar,$rank_images,$poster_details,$poster,$signature)=$poster_details_cache[$_postdetails['poster']][$_postdetails['poster_username']];
 				} else
 				{
 					// Avatar
@@ -247,7 +253,7 @@ class Module_topicview
 						$signature=$_postdetails['signature'];
 					}
 
-					$poster_details_cache[$_postdetails['poster']]=array($post_avatar,$rank_images,$poster_details,$poster,$signature);
+					$poster_details_cache[$_postdetails['poster']][$_postdetails['poster_username']]=array($post_avatar,$rank_images,$poster_details,$poster,$signature);
 				}
 
 				$post_title=$_postdetails['title'];
@@ -277,7 +283,7 @@ class Module_topicview
 				}
 
 				if ((isset($GLOBALS['META_DATA']['description'])) && ($GLOBALS['META_DATA']['description']=='') && (($_postdetails['id']===$jump_post_id) || (($array_id==0) && ($jump_post_id===NULL))))
-					$GLOBALS['META_DATA']['description']=html_entity_decode(strip_tags(symbol_truncator(array($_postdetails['post']),'200','0','1','0.2'),'left'),ENT_QUOTES,get_charset());
+					$GLOBALS['META_DATA']['description']=html_entity_decode(strip_tags(symbol_truncator(array($_postdetails['post'],'200','0','1','0.2'),'left')),ENT_QUOTES,get_charset());
 
 				$rendered_post=do_template('OCF_TOPIC_POST',array(
 							'_GUID'=>'sacd09wekfofpw2f',
@@ -343,6 +349,8 @@ class Module_topicview
 			if (!is_null($threaded_topic_ob->topic_title)) // Updated topic title
 				$topic_info['title']=$threaded_topic_ob->topic_title;
 			$topic_info['max_rows']=$threaded_topic_ob->total_posts;
+
+			$second_poster=$GLOBALS['FORUM_DRIVER']->get_guest_id(); // No definitive post orders
 		}
 
 		// Buttons for topic as whole
@@ -601,7 +609,7 @@ class Module_topicview
 				{
 					$moderator_actions.='<optgroup label="'.do_lang('MULTI_MODERATIONS').'">';
 					foreach ($multi_moderations as $mm_id=>$mm_name)
-						$moderator_actions.='<option value="mm_'.strval($mm_id).'">'.$mm_name.'</option>';
+						$moderator_actions.='<option value="mm_'.strval($mm_id).'">'.escape_html($mm_name).'</option>';
 					$moderator_actions.='</optgroup>';
 				}
 			}

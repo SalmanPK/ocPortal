@@ -52,6 +52,7 @@ function require_lang_compile($codename,$lang,$type,$cache_path,$ignore_errors=f
 			// Cleanup language strings
 			if (!$DECACHED_COMCODE_LANG_STRINGS)
 			{
+				$DECACHED_COMCODE_LANG_STRINGS=true;
 				$comcode_lang_strings=$GLOBALS['SITE_DB']->query_select('cached_comcode_pages',array('string_index'),array('the_zone'=>'!'),'',NULL,NULL,true);
 				if (!is_null($comcode_lang_strings))
 				{
@@ -61,7 +62,6 @@ function require_lang_compile($codename,$lang,$type,$cache_path,$ignore_errors=f
 						delete_lang($comcode_lang_string['string_index']);
 					}
 				}
-				$DECACHED_COMCODE_LANG_STRINGS=true;
 			}
 		}
 
@@ -102,6 +102,8 @@ function require_lang_compile($codename,$lang,$type,$cache_path,$ignore_errors=f
 				$lang_file=get_custom_file_base().'/lang_custom/'.$lang.'/'.$codename.'.po';
 				if (!file_exists($lang_file))
 					$lang_file=get_file_base().'/lang_custom/'.$lang.'/'.$codename.'-'.strtolower($lang).'.po';
+				if (!file_exists($lang_file))
+					$lang_file=get_file_base().'/lang_custom/'.$lang.'/'.$codename.'_'.strtolower($lang).'.po';
 			}
 		}
 		if (($type!='lang') && (file_exists($lang_file)))
@@ -137,7 +139,14 @@ function require_lang_compile($codename,$lang,$type,$cache_path,$ignore_errors=f
 
 			if (($codename!='critical_error') || ($lang!=get_site_default_lang()))
 			{
-				fatal_exit(do_lang_tempcode('MISSING_LANG_FILE',escape_html($codename),escape_html($lang)));
+				$error_msg=do_lang_tempcode('MISSING_LANG_FILE',escape_html($codename),escape_html($lang));
+				if (get_page_name()=='admin_themes')
+				{
+					warn_exit($error_msg);
+				} else
+				{
+					fatal_exit($error_msg);
+				}
 			} else
 			{
 				critical_error('CRIT_LANG');

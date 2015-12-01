@@ -171,13 +171,32 @@ function get_zone_name()
 	{
 		$VIRTUALISED_ZONES=false;
 		$url_path=dirname(ocp_srv('REQUEST_URI'));
+		$host=preg_replace('#:\d+$#','',ocp_srv('HTTP_HOST'));
 		foreach ($SITE_INFO as $key=>$val)
 		{
 			if (($key[0]=='Z') && (substr($key,0,13)=='ZONE_MAPPING_') && (is_array($val)))
 			{
 				$VIRTUALISED_ZONES=true;
-				if ((preg_replace('#:\d+$#','',ocp_srv('HTTP_HOST'))==$val[0]) && (preg_match('#^'.(($val[1]=='')?'':('/'.preg_quote($val[1]))).'(/|$)#',$url_path)!=0))
+				if (($host==$val[0]) && (preg_match('#^'.(($val[1]=='')?'':('/'.preg_quote($val[1]))).'(/|$)#',$url_path)!=0))
 					return substr($key,13);
+			}
+		}
+		if (($VIRTUALISED_ZONES) && (substr($host,0,4)=='www.'))
+		{
+			$host=substr($host,4);
+			foreach ($SITE_INFO as $key=>$val)
+			{
+				if (($key[0]=='Z') && (substr($key,0,13)=='ZONE_MAPPING_') && (is_array($val)))
+				{
+					if (($host==$val[0]) && (preg_match('#^'.(($val[1]=='')?'':('/'.preg_quote($val[1]))).'(/|$)#',$url_path)!=0))
+					{
+						require_code('urls');
+						$GLOBALS['HTTP_STATUS_CODE']='301';
+						header('HTTP/1.0 301 Moved Permanently');
+						header('Location: '.str_replace(chr(13),'',str_replace(chr(10),'',str_replace('://www.','://',get_self_url_easy()))));
+						exit();
+					}
+				}
 			}
 		}
 	}
@@ -348,7 +367,9 @@ function load_minimodule_page($string)
 	ob_start();
 	require_code(filter_naughty($string));
 	$out=new ocp_tempcode();
-	$out->attach(ob_get_contents());
+	$c=ob_get_contents();
+	if ($GLOBALS['XSS_DETECT']) ocp_mark_as_escaped($c);
+	$out->attach($c);
 	ob_end_clean();
 
 	restrictify();
@@ -649,12 +670,12 @@ function do_block($codename,$map=NULL,$ttl=NULL)
 {
 	global $LANGS_REQUESTED,$JAVASCRIPTS,$CSSS,$DO_NOT_CACHE_THIS;
 
-	$DO_NOT_CACHE_THIS=false;
-
 	if (is_null($map)) $map=array();
 
 	if (!array_key_exists('cache',$map))
 		$map['cache']=block_cache_default($codename);
+
+	$DO_NOT_CACHE_THIS=($map['cache']=='0');
 
 	$object=NULL;
 	if (((get_option('is_on_block_cache')=='1') || (get_param_integer('keep_cache',0)==1) || (get_param_integer('cache',0)==1) || (get_param_integer('cache_blocks',0)==1)) && ((get_param_integer('keep_cache',NULL)!==0) && (get_param_integer('cache_blocks',NULL)!==0) && (get_param_integer('cache',NULL)!==0)) && (strpos(get_param('special_page_type',''),'t')===false))
@@ -871,6 +892,7 @@ function do_block_hunt_file($codename,$map=NULL)
 				require($file_base.'/sources_custom/miniblocks/'.$codename.'.php');
 			}
 			$object=ob_get_contents();
+			if ($GLOBALS['XSS_DETECT']) ocp_mark_as_escaped($object);
 			ob_end_clean();
 			restrictify();
 
@@ -893,6 +915,7 @@ function do_block_hunt_file($codename,$map=NULL)
 				require($file_base.'/sources/miniblocks/'.$codename.'.php');
 			}
 			$object=ob_get_contents();
+			if ($GLOBALS['XSS_DETECT']) ocp_mark_as_escaped($object);
 			ob_end_clean();
 			restrictify();
 

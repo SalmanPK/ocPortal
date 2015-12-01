@@ -39,6 +39,10 @@ class Hook_cron_calendar
 			$or_list='';
 			foreach ($jobs as $job)
 			{
+				// Build up OR list of the jobs
+				if ($or_list!='') $or_list.=' OR ';
+				$or_list.='id='.strval($job['id']);
+
 				$recurrences=find_periods_recurrence($job['e_timezone'],1,$job['e_start_year'],$job['e_start_month'],$job['e_start_day'],$job['e_start_monthly_spec_type'],is_null($job['e_start_hour'])?find_timezone_start_hour_in_utc($job['e_timezone'],$job['e_start_year'],$job['e_start_month'],$job['e_start_day'],$job['e_start_monthly_spec_type']):$job['e_start_hour'],is_null($job['e_start_minute'])?find_timezone_start_minute_in_utc($job['e_timezone'],$job['e_start_year'],$job['e_start_month'],$job['e_start_day'],$job['e_start_monthly_spec_type']):$job['e_start_minute'],$job['e_end_year'],$job['e_end_month'],$job['e_end_day'],$job['e_end_monthly_spec_type'],is_null($job['e_end_hour'])?find_timezone_end_hour_in_utc($job['e_timezone'],$job['e_end_year'],$job['e_end_month'],$job['e_end_day'],$job['e_end_monthly_spec_type']):$job['e_end_hour'],is_null($job['e_end_minute'])?find_timezone_end_minute_in_utc($job['e_timezone'],$job['e_end_year'],$job['e_end_month'],$job['e_end_day'],$job['e_end_monthly_spec_type']):$job['e_end_minute'],$job['e_recurrence'],min(1,$job['e_recurrences']));
 
 				$start_day_of_month=find_concrete_day_of_month($job['e_start_year'],$job['e_start_month'],$job['e_start_day'],$job['e_start_monthly_spec_type'],is_null($job['e_start_hour'])?find_timezone_start_hour_in_utc($job['e_timezone'],$job['e_start_year'],$job['e_start_month'],$job['e_start_day'],$job['e_start_monthly_spec_type']):$job['e_start_hour'],is_null($job['e_start_minute'])?find_timezone_start_minute_in_utc($job['e_timezone'],$job['e_start_year'],$job['e_start_month'],$job['e_start_day'],$job['e_start_monthly_spec_type']):$job['e_start_minute'],$job['e_timezone'],$job['e_do_timezone_conv']==1);
@@ -62,7 +66,7 @@ class Hook_cron_calendar
 							// Backwards-compatibility for pure PHP code (if its creation date was before the time of writing this comment [Wednesday 22nd Match, 14:58])
 							if (($job['e_add_date']<1143046670) && (!defined('HIPHOP_PHP')))
 							{
-								@ini_set('ocproducts.xss_detect','0');
+								safe_ini_set('ocproducts.xss_detect','0');
 								$to_echo=eval($job_text);
 								if ($to_echo===false) fatal_exit(@strval($php_errormsg));
 							} else
@@ -103,10 +107,6 @@ class Hook_cron_calendar
 						'j_event_id'=>$job['j_event_id']
 					));
 				}
-
-				// Build up OR list of the jobs
-				if ($or_list!='') $or_list.=' OR ';
-				$or_list.='id='.strval($job['id']);
 			}
 
 			// Delete jobs just run

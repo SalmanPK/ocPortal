@@ -48,7 +48,7 @@ class Module_groups
 	 */
 	function get_entry_points()
 	{
-		return array('misc'=>'USERGROUPS');
+		return (get_forum_type()!='ocf')?array():array('misc'=>'USERGROUPS');
 	}
 
 	/**
@@ -363,7 +363,7 @@ class Module_groups
 		} else $add_url=new ocp_tempcode();
 
 		// To apply
-		$my_groups=$GLOBALS['FORUM_DRIVER']->get_members_groups(get_member());
+		$my_groups=$GLOBALS['FORUM_DRIVER']->get_members_groups(get_member(),false,false);
 		if (is_guest())
 		{
 			$apply_url=new ocp_tempcode();
@@ -462,7 +462,7 @@ class Module_groups
 			}
 		}
 
-		breadcrumb_set_self(make_string_tempcode($name));
+		breadcrumb_set_self(make_string_tempcode(escape_html($name)));
 		breadcrumb_set_parents(array(array('_SELF:_SELF:misc',do_lang_tempcode('USERGROUPS'))));
 
 		if (has_actual_page_access(get_member(),'admin_ocf_groups',get_module_zone('admin_ocf_groups')))
@@ -484,7 +484,7 @@ class Module_groups
 			'publisher'=>'', // blank means same as creator
 			'modified'=>'',
 			'type'=>'Usergroup',
-			'title'=>$group_name,
+			'title'=>comcode_escape($group_name),
 			'identifier'=>'_SEARCH:groups:view:'.strval($id),
 			'description'=>'',
 			'image'=>find_theme_image('bigicons/usergroups'),
@@ -535,7 +535,7 @@ class Module_groups
 		$member_id=$GLOBALS['FORUM_DRIVER']->get_member_from_username($username);
 		if (is_null($member_id)) warn_exit(do_lang_tempcode('_USER_NO_EXIST',escape_html($username)));
 
-		$test=$GLOBALS['FORUM_DRIVER']->get_members_groups($member_id);
+		$test=$GLOBALS['FORUM_DRIVER']->get_members_groups($member_id,false,false);
 		if (in_array($id,$test))
 		{
 			warn_exit(do_lang_tempcode('ALREADY_IN_GROUP'));

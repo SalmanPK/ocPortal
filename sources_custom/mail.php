@@ -32,6 +32,11 @@ function mail_wrap($subject_line,$message_raw,$to_email=NULL,$to_name=NULL,$from
 
 	if (@$GLOBALS['SITE_INFO']['no_email_output']==='1') return NULL;
 
+	if (is_null($bypass_queue))
+	{
+		$bypass_queue=(($priority<3) || (strpos(serialize($attachments),'tmpfile')!==false));
+	}
+
 	global $EMAIL_ATTACHMENTS;
 	$EMAIL_ATTACHMENTS=array();
 
@@ -345,6 +350,7 @@ function mail_wrap($subject_line,$message_raw,$to_email=NULL,$to_name=NULL,$from
 		->setFrom(array($website_email=>$from_name))
 		->setReplyTo(array($from_email=>$from_name))
 		->setTo($to_array)
+		->setDate(time())
 		->setPriority($priority)
 		->setCharset($charset)
 		->setBody($html_evaluated,'text/html',$charset)

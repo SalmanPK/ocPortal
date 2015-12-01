@@ -204,14 +204,14 @@ function get_url($specify_name,$attach_name,$upload_folder,$obfuscate=0,$enforce
 
 	if (!file_exists(get_custom_file_base().'/'.$upload_folder))
 	{
-		$success=@mkdir(get_custom_file_base().'/'.$upload_folder,0777);
+		$success=@mkdir(get_custom_file_base().'/'.$upload_folder,0777,true);
 		if ($success===false) warn_exit(@strval($php_errormsg));
 		fix_permissions(get_custom_file_base().'/'.$upload_folder,0777);
 		sync_file($upload_folder);
 	}
 	if ((!file_exists(get_custom_file_base().'/'.$thumb_folder)) && ($make_thumbnail))
 	{
-		$success=@mkdir(get_custom_file_base().'/'.$thumb_folder,0777);
+		$success=@mkdir(get_custom_file_base().'/'.$thumb_folder,0777,true);
 		if ($success===false) warn_exit(@strval($php_errormsg));
 		fix_permissions(get_custom_file_base().'/'.$thumb_folder,0777);
 		sync_file($thumb_folder);
@@ -251,7 +251,7 @@ function get_url($specify_name,$attach_name,$upload_folder,$obfuscate=0,$enforce
 	}
 	elseif (post_param($specify_name,'')!='') // If we specified
 	{
-		$is_image=is_image($_POST[$specify_name]);
+		$is_image=is_image($_POST[$specify_name],true);
 
 		$url=_get_specify_url($specify_name,$upload_folder,$enforce_type,$accept_errors);
 		if ($url==array('','')) return array('','','','');
@@ -431,7 +431,7 @@ function get_url($specify_name,$attach_name,$upload_folder,$obfuscate=0,$enforce
 			if ($gd)
 			{
 				if ((!is_saveable_image($url[0])) && (get_file_extension($url[0])!='svg')) $ext='.png'; else $ext='';
-				$file=basename($url[0]);
+				$file=preg_replace('#[^\w\.]#','x',basename($url[0]));
 				$_file=$file;
 				$place=get_custom_file_base().'/'.$thumb_folder.'/'.$_file.$ext;
 				$i=2;
@@ -522,7 +522,14 @@ function _get_specify_url($specify_name,$upload_folder,$enforce_type=0,$accept_e
 		$missing_ok=false;
 
 		// Its not in the upload folder, so maybe we aren't allowed to download it
-		if (((substr($url[0],0,strlen($upload_folder)+1)!=$upload_folder.'/') && (substr($url[0],0,strlen('data/images/')+1)!='data/images/')) || (strpos($url[0],'..')!==false))
+		if (
+			(
+				(substr($url[0],0,strlen($upload_folder)+1)!=$upload_folder.'/') && 
+				(substr($url[0],0,strlen('data/images/')+1)!='data/images/') && 
+				(preg_match('#^[^\?\.]*\.(m4v|mp4|flv|f4v|mpeg|mpg|webm|ogv|png|gif|jpg|jpeg|jpe)$#',$url[0])==0)/*Streaming/compression plugins can mess up our script detection so whitelist some formats*/
+			) ||
+			(strpos($url[0],'..')!==false)
+		)
 		{
 			$myfile=@fopen(get_custom_file_base().'/'.rawurldecode($url[0]),'rb');
 			if ($myfile!==false)
@@ -575,11 +582,11 @@ function _get_specify_url($specify_name,$upload_folder,$enforce_type=0,$accept_e
 function _check_enforcement_of_type($file,$enforce_type,$accept_errors=false)
 {
 	require_code('images');
-	if (($enforce_type==OCP_UPLOAD_IMAGE_OR_SWF) && (!is_image($file)) && (get_file_extension($file)!='swf'))
+	if (($enforce_type==OCP_UPLOAD_IMAGE_OR_SWF) && (!is_image($file,true)) && (get_file_extension($file)!='swf'))
 	{
 		warn_exit(do_lang_tempcode('NOT_IMAGE'));
 	}
-	if (($enforce_type==OCP_UPLOAD_IMAGE) && (!is_image($file)))
+	if (($enforce_type==OCP_UPLOAD_IMAGE) && (!is_image($file,true)))
 	{
 //		if ($accept_errors)
 //			attach_message(do_lang_tempcode('NOT_IMAGE'),'warn');
@@ -634,7 +641,7 @@ function _get_upload_url($attach_name,$upload_folder,$enforce_type=0,$obfuscate=
 	_check_enforcement_of_type($file,$enforce_type,$accept_errors);
 
 	// If we are not obfuscating then we will need to search for an available filename
-	if (($obfuscate==0) || ($obfuscate==3))
+	if (($obfuscate==0) || ($obfuscate==3) || (strlen($file)>150))
 	{
 		$_file=preg_replace('#\..*\.#','.',$file);
 		$place=get_custom_file_base().'/'.$upload_folder.'/'.$_file;
@@ -689,7 +696,7 @@ function _get_upload_url($attach_name,$upload_folder,$enforce_type=0,$obfuscate=
 	// Special code to re-orientate JPEG images if required (browsers cannot do this)
 	if (($enforce_type==OCP_UPLOAD_IMAGE) || (($enforce_type==OCP_UPLOAD_IMAGE_OR_SWF) && (substr($place,-4)!='.swf')))
 	{
-		if ((get_option('is_on_gd')=='1') && (function_exists('imagecreatefromstring'))) // TODO: No is_on_gd in v10
+		if ((get_option('is_on_gd')=='1') && (function_exists('imagepng'))) // TODO: No is_on_gd in v10
 		{
 			require_code('images');
 			convert_image($place,$place,-1,-1,100000/*Impossibly large size, so no resizing happens*/,false,NULL,true,true);

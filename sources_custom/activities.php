@@ -30,6 +30,8 @@ function get_activity_querying_sql($viewer_id,$mode,$member_ids)
 {
 	$proceed_selection=true; // There are some cases in which even glancing at the database is a waste of precious time.
 
+	require_all_lang();
+
 	/*if (isset($member_ids[0])) // Useful for testing
 		$viewer_id=$member_ids[0];*/
 
@@ -188,6 +190,8 @@ function get_activity_querying_sql($viewer_id,$mode,$member_ids)
 	      break;
 	}
 
+	if (!isset($where_clause)) $where_clause='';
+
 	return array($proceed_selection,$where_clause);
 }
 
@@ -196,7 +200,7 @@ function get_activity_querying_sql($viewer_id,$mode,$member_ids)
  *
  * @param  array			Database row
  * @param  boolean		Whether the rendered activity will be shown in a live ocPortal (as opposed to being e-mailed, for example)
- * @return tempcode		Rendered activity
+ * @return array			Rendered activity
  */
 function render_activity($row,$use_inside_ocp=true)
 {

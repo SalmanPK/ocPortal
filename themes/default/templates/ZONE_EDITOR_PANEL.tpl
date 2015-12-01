@@ -56,11 +56,11 @@
 
 				{+START,IF,{$IN_STR,{CLASS},wysiwyg}}
 					<script type="text/javascript">// <![CDATA[
-						if ((window.wysiwyg_on) && (wysiwyg_on())) document.getElementById('edit_{ID*;}_textarea').readOnly=true;
+						if ((window.wysiwyg_on) && (wysiwyg_on())) document.getElementById('edit_{ID;/}_textarea').readOnly=true;
 					//]]></script>
 				{+END}
 				{+START,IF_PASSED,DEFAULT_PARSED}
-					<textarea cols="1" rows="1" style="display: none" readonly="readonly" name="edit_{ID*;}_textarea_parsed">{DEFAULT_PARSED*}</textarea>
+					<textarea cols="1" rows="1" style="display: none" readonly="readonly" disabled="disabled" name="edit_{ID*;}_textarea_parsed">{DEFAULT_PARSED*}</textarea>
 				{+END}
 			</div>
 		</form>

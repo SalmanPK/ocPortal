@@ -22,10 +22,10 @@
 {$,iPhone/Android/etc should know they have an optimised design heading to them}
 {+START,IF,{$MOBILE}}
 	{+START,IF,{$NOT,{$_GET,overlay}}}
-		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
 	{+END}
 	{+START,IF,{$_GET,overlay}}
-		<meta name="viewport" content="width=280, initial-scale=1.0, user-scalable=yes" />
+		<meta name="viewport" content="width=280, initial-scale=1, user-scalable=yes" />
 	{+END}
 {+END}
 {+START,IF,{$NOT,{$MOBILE}}}
@@ -90,9 +90,7 @@
 {$,NB: We also support standard metadata, schema.org, semantic HTML5, ARIA, OpenSearch, and OCPCORE}
 
 {$,Favicon and iOS icon for site, managed as theme images}
-{+START,IF,{$NOT,{$BROWSER_MATCHES,chrome}}}
-	<link rel="icon" href="{$IMG*,appleicon}" sizes="64x64 128x128" /> {$,Used on Opera speed dial}
-{+END}
+<link rel="icon" href="{$IMG*,appleicon}" sizes="64x64 128x128" /> {$,Used on Opera speed dial}
 <link rel="apple-touch-icon" href="{$IMG*,appleicon}" />
 <link rel="shortcut icon" href="{$IMG*,favicon}" type="image/x-icon" sizes="16x16 32x32" />
 
@@ -126,7 +124,7 @@
 
 		(function() {
 			var ga=document.createElement('script'); ga.type='text/javascript'; ga.async=true;
-			ga.src=('https:'==document.location.protocol?'https://ssl':'http://www')+'.google-analytics.com/ga.js';
+			ga.src = ('https:' == document.location.protocol ? 'https://' : 'http://') + 'stats.g.doubleclick.net/dc.js';
 			var s=document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga,s);
 		})();
 	</script>
@@ -138,16 +136,7 @@
 {$,Javascript code (usually) from ocPortal page}
 {$EXTRA_HEAD}
 
-{$,Javascript includes from ocPortal page}
-{$JS_TEMPCODE,header}
-<!--[if lt IE 9]>
-<script src="{$BASE_URL*}/data/html5.js"></script>
-<![endif]-->
-
-{$,jQuery fan? Just uncomment the below and start using all the jQuery plugins you love in the normal way}
-{$,<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js"></script>}
-
-{$,Detecting of Timezones and Javascript support}
+{$,Detecting of Timezones and Javascript support. Must go above JS_TEMPCODE because of init settings.}
 <script type="text/javascript">// <![CDATA[
 	{+START,IF,{$CONFIG_OPTION,detect_javascript}}
 		{+START,IF,{$AND,{$EQ,,{$_GET,keep_has_js}},{$NOT,{$JS_ON}}}}
@@ -156,8 +145,17 @@
 		{+END}
 	{+END}
 	{+START,IF,{$NOT,{$BROWSER_MATCHES,ie}}}{+START,IF,{$HAS_PRIVILEGE,sees_javascript_error_alerts}}window.take_errors=true;{+END}{+END}
-	var {+START,IF,{$CONFIG_OPTION,is_on_timezone_detection}}server_timestamp={$FROM_TIMESTAMP%},{+END}ocp_lang='{$LANG;}',ocp_theme='{$THEME;}',ocp_username='{$USERNAME;}'{+START,IF,{$IS_STAFF}},ocp_is_staff=true{+END};
+	var {+START,IF,{$CONFIG_OPTION,is_on_timezone_detection}}server_timestamp={$FROM_TIMESTAMP%},{+END}ocp_lang='{$LANG;/}',ocp_theme='{$THEME;/}',ocp_username='{$USERNAME;/}'{+START,IF,{$IS_STAFF}},ocp_is_staff=true{+END};
 //]]></script>
+
+{$,Javascript includes from ocPortal page}
+{$JS_TEMPCODE,header}
+<!--[if lt IE 9]>
+<script src="{$BASE_URL*}/data/html5.js"></script>
+<![endif]-->
+
+{$,jQuery fan? Just uncomment the below and start using all the jQuery plugins you love in the normal way}
+{$,<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js"></script>}
 
 {$,If the page is doing a refresh include the markup for that}
 {$REFRESH}

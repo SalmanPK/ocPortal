@@ -143,12 +143,12 @@ function make_backup_2($file=NULL,$b_type=NULL,$max_size=NULL) // This is called
 	if (function_exists('set_time_limit')) @set_time_limit(0);
 	$logfile_path=get_custom_file_base().'/exports/backups/'.$file.'.txt';
 	$logfile=@fopen($logfile_path,'wt') OR intelligent_write_error($logfile_path); // .txt file because IIS doesn't allow .log download
-	@ini_set('log_errors','1');
-	@ini_set('error_log',$logfile_path);
+	safe_ini_set('log_errors','1');
+	safe_ini_set('error_log',$logfile_path);
 	fwrite($logfile,'This is a log file for an ocPortal backup. The backup is not complete unless this log terminates with a completion message.'."\n\n");
 
 	require_code('tar');
-	$myfile=tar_open(get_custom_file_base().'/exports/backups/'.filter_naughty($file),'wb');
+	$myfile=tar_open(get_custom_file_base().'/exports/backups/'.filter_naughty($file).'.tmp','wb');
 
 	// Write readme.txt file
 	tar_add_file($myfile,'readme.txt',do_lang('BACKUP_README',get_timezoned_date(time())),0664,time());
@@ -231,8 +231,8 @@ function make_backup_2($file=NULL,$b_type=NULL,$max_size=NULL) // This is called
 		set_value('last_backup',strval(time()));
 	}
 	tar_close($myfile);
-	if (!file_exists(get_custom_file_base().'/exports/backups/'.filter_naughty($file))) warn_exit(do_lang_tempcode('INTERNAL_ERROR'));
-	rename(get_custom_file_base().'/exports/backups/'.filter_naughty($file),get_custom_file_base().'/exports/backups/'.filter_naughty($file).'.tar');
+	if (!file_exists(get_custom_file_base().'/exports/backups/'.filter_naughty($file).'.tmp')) warn_exit(do_lang_tempcode('INTERNAL_ERROR'));
+	rename(get_custom_file_base().'/exports/backups/'.filter_naughty($file).'.tmp',get_custom_file_base().'/exports/backups/'.filter_naughty($file).'.tar');
 	sync_file('exports/backups/'.filter_naughty($file).'.tar');
 	fix_permissions('exports/backups/'.filter_naughty($file).'.tar');
 

@@ -71,7 +71,7 @@ function zip_error($errno,$mzip=false)
 	$errmsg='unknown';
 	foreach ($zip_file_function_errors as $const_name=>$error_message)
 	{
-		if ((defined($const_name)) && (constant($const_name))==$errno)
+		if ((defined($const_name)) && (@constant($const_name))===$errno)
 		{
 			$errmsg=$error_message;
 		}
@@ -222,7 +222,7 @@ function _ocportal_error_handler($type,$errno,$errstr,$errfile,$errline)
 
 	if (!$GLOBALS['SUPPRESS_ERROR_DEATH']) // Don't display - die as normal
 	{
-		@ini_set('display_errors','0');
+		safe_ini_set('display_errors','0');
 		fatal_exit('PHP '.strtoupper($type).' ['.strval($errno).'] '.$errstr.' in '.$errfile.' on line '.strval($errline));
 		relay_error_notification($out);
 		exit();
@@ -315,7 +315,7 @@ function _generic_exit($text,$template)
 	global $EXITING;
 	if ((running_script('upgrader')) || (!function_exists('get_screen_title'))) critical_error('PASSON',is_object($text)?$text->evaluate():$text);
 
-	if (($EXITING==1) || (!function_exists('get_member'))) critical_error('EMERGENCY',is_object($text)?$text->evaluate():escape_html($text));
+	if (($EXITING>=1) || (!function_exists('get_member'))) critical_error('EMERGENCY',is_object($text)?$text->evaluate():escape_html($text));
 	$EXITING++;
 	if (!function_exists('do_header')) require_code('site');
 
@@ -477,15 +477,10 @@ function _log_hack_attack_and_exit($reason,$reason_param_a='',$reason_param_b=''
 	{
 		// Test we're not banning a good bot
 		$se_ip_lists=array(
+			// NB: We're using Coral Cache (nyud.net)
 			'http://www.iplists.com.nyud.net/nw/google.txt'=>false,
-			'http://www.iplists.com.nyud.net/nw/msn.txt'=>false,
-			'http://www.iplists.com.nyud.net/infoseek.txt'=>false,
-			'http://www.iplists.com.nyud.net/nw/inktomi.txt'=>false,
-			'http://www.iplists.com.nyud.net/nw/lycos.txt'=>false,
-			'http://www.iplists.com.nyud.net/nw/askjeeves.txt'=>false,
-			'http://www.iplists.com.nyud.net/northernlight.txt'=>false,
-			'http://www.iplists.com.nyud.net/nw/altavista.txt'=>false,
-			'http://www.iplists.com.nyud.net/nw/misc.txt'=>false,
+			'http://www.iplists.com.nyud.net/nw/misc.txt'=>false, // Includes Bing, Yandex, SOSO, Sogou, Baidu, Ask Jeeves (aka Teoma)
+			// NB: Yahoo (aka Slurp aka Inktomi), AltaVista, InfoSeek, Lycos, are all confirmed defunct.
 			'https://www.cloudflare.com/ips-v4'=>true,
 			'https://www.cloudflare.com/ips-v6'=>true,
 		);
@@ -766,10 +761,10 @@ function _fatal_exit($text,$return=false)
 
 	if (running_script('occle'))
 	{
-		header('Content-Type: text/xml');
+		header('Content-Type: text/xml; charset='.get_charset());
 		header('HTTP/1.0 200 Ok');
 
-		header('Content-type: text/xml');
+		header('Content-type: text/xml; charset='.get_charset());
 		$output='<'.'?xml version="1.0" encoding="'.get_charset().'" ?'.'>
 <response>
 	<result>
@@ -893,13 +888,18 @@ function relay_error_notification($text,$ocproducts=true,$notification_type='err
 
 	require_code('notifications');
 	require_code('comcode');
-	$mail=do_lang('ERROR_MAIL',comcode_escape($error_url),$text,NULL,get_site_default_lang());
+	$mail=do_lang('ERROR_MAIL',comcode_escape($error_url),str_replace(array('[html','[/html'),array('&#91;html','&#91;/html'),$text),NULL,get_site_default_lang());
 	dispatch_notification($notification_type,NULL,do_lang('ERROR_OCCURRED_SUBJECT',get_page_name(),NULL,NULL,get_site_default_lang()),$mail,NULL,A_FROM_SYSTEM_PRIVILEGED);
 	if (
 		($ocproducts) && 
 		(get_option('send_error_emails_ocproducts',true)=='1') && 
 		(!running_script('cron_bridge')) && 
 		(strpos($text,'_custom/')===false) && 
+		(strpos($text,'_custom\\')===false) && 
+		(strpos($text,'Search: Operations error')===false) && // LDAP error, misconfiguration
+		(strpos($text,'Can\'t contact LDAP server')===false) && // LDAP error, network issue
+		(strpos($text,'Unknown: failed to open stream')===false) && // Comes up on some free web hosts
+		(strpos($text,'failed with: Connection refused')===false) && // Memcache error
 		(strpos($text,'data/occle.php')===false) && 
 		(strpos($text,'/mini')===false) && 
 		(strpos($text,'A transaction for the wrong IPN e-mail went through')===false) && 
@@ -907,28 +907,36 @@ function relay_error_notification($text,$ocproducts=true,$notification_type='err
 		(strpos($text,'has been disabled for security reasons')===false) && 
 		(strpos($text,'max_questions')/*mysql limit*/===false) && 
 		(strpos($text,'Error at offset')===false) && 
+		(strpos($text,'No word lists can be found for the language &quot;en&quot;')===false) && 
 		(strpos($text,'Unable to allocate memory for pool')===false) && 
 		(strpos($text,'Out of memory')===false) && 
 		(strpos($text,'Can\'t open file')===false) && 
+		(strpos($text,'INSERT command denied to user')===false) && 
 		(strpos($text,'Disk is full writing')===false) && 
 		(strpos($text,'Disk quota exceeded')===false) && 
+		(strpos($text,'No space left on device')===false) && 
 		(strpos($text,'from storage engine')===false) && 
 		(strpos($text,'Lost connection to MySQL server')===false) && 
 		(strpos($text,'Unable to save result set')===false) && 
-		(strpos($text,'.MYI')===false) && 
-		(strpos($text,'.MYD')===false) && 
+		(strpos($text,'.MAI')===false) && // MariaDB
+		(strpos($text,'.MAD')===false) && // MariaDB
+		(strpos($text,'.MYI')===false) && // MySQL
+		(strpos($text,'.MYD')===false) && // MySQL 
 		(strpos($text,'MySQL server has gone away')===false) && 
 		(strpos($text,'Incorrect key file')===false) && 
 		(strpos($text,'Too many connections')===false) && 
 		(strpos($text,'Incorrect string value')===false) && 
 		(strpos($text,'Can\'t create/write to file')===false) &&  // MySQL
 		(strpos($text,'Error writing file')===false) && // E.g. cannot PHP create a temporary file
+		(strpos($text,'possibly out of free disk space')===false) && 
 		(strpos($text,'Illegal mix of collations')===false) && 
 		(strpos($text,'marked as crashed and should be repaired')===false) && 
 		(strpos($text,'connect to')===false) && 
 		(strpos($text,'Access denied for')===false) && 
 		(strpos($text,'Unknown database')===false) && 
+		(strpos($text,'Broken pipe')===false) && 
 		(strpos($text,'headers already sent')===false) && 
+		(preg_match('#php\.net.*SSL3_GET_SERVER_CERTIFICATE:certificate #',$text)==0) && // Missing certificates on server
 		(preg_match('#Maximum execution time of \d+ seconds#',$text)==0) && 
 		(preg_match('#Out of memory \(allocated (1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24)\d{6}\)#',$text)==0) && 
 		(strpos($text,'is marked as crashed and last')===false) && 

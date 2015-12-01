@@ -59,12 +59,12 @@ function do_comcode_attachments($original_comcode,$type,$id,$previewing_only=fal
 	$comcode_text=(substr($original_comcode,0,8)!='<comcode');
 
 	// Handle data URLs for attachment embedding
-	if (function_exists('imagecreatefromstring'))
+	if (function_exists('imagepng'))
 	{
 		$matches=array();
 		$matches2=array();
-		$num_matches=preg_match_all('#<img (alt="" )?src="data:image/\w+;base64,([^"]*)" (title="" )?/?'.'>#',$original_comcode,$matches);
-		$num_matches2=preg_match_all('#\[img param=""\]data:image/\w+;base64,([^"]*)\[/img\]#',$original_comcode,$matches2);
+		$num_matches=preg_match_all('#<img[^<>]*src="data:image/\w+;base64,([^"]*)"[^<>]*>#',$original_comcode,$matches);
+		$num_matches2=preg_match_all('#\[img[^\[\]]*\]data:image/\w+;base64,([^"]*)\[/img\]#',$original_comcode,$matches2);
 		for ($i=0;$i<$num_matches2;$i++)
 		{
 			$matches[0][$num_matches]=$matches2[0][$i];
@@ -76,7 +76,7 @@ function do_comcode_attachments($original_comcode,$type,$id,$previewing_only=fal
 			if (strpos($original_comcode,$matches[0][$i])!==false) // Check still here (if we have same image in multiple places, may have already been attachment-ified)
 			{
 				$data=@base64_decode($matches[1][$i]);
-				if ($data!==false)
+				if (($data!==false) && (function_exists('imagepng')))
 				{
 					$image=@imagecreatefromstring($data);
 					if ($image!==false)
@@ -101,7 +101,7 @@ function do_comcode_attachments($original_comcode,$type,$id,$previewing_only=fal
 							'a_add_time'=>time()),true);
 						$GLOBALS['SITE_DB']->query_insert('attachment_refs',array('r_referer_type'=>$type,'r_referer_id'=>$id,'a_id'=>$attachment_id));
 
-						$original_comcode=str_replace($original_comcode,$matches[0][$i],'[attachment type="inline" thumb="0"]'.strval($attachment_id).'[/attachment]');
+						$original_comcode=str_replace($matches[0][$i],'[attachment type="inline" thumb="0"]'.strval($attachment_id).'[/attachment]',$original_comcode);
 					}
 				}
 			}
@@ -356,19 +356,26 @@ function do_comcode_attachments($original_comcode,$type,$id,$previewing_only=fal
 	{
 		// Put in correct attachment IDs
 		$ids_present=array();
+		$COMCODE_ATTACHMENTS[$id]=array_reverse($COMCODE_ATTACHMENTS[$id]); // Reverse order - So that we do our substitutions in a cleaner order
 		for ($i=0;$i<count($COMCODE_ATTACHMENTS[$id]);$i++)
 		{
 			$attachment=$COMCODE_ATTACHMENTS[$id][$i];
 
 			$marker_matches=array();
-			preg_match('#new_(\d+)[\[<]#',substr($original_comcode,0,$attachment['marker']),$marker_matches);
-			$marker_id=array_key_exists(1,$marker_matches)?intval($marker_matches[1]):strval($i+1); // Should always exist, but if not (some weird internal Comcode parsing error -- this stuff is complex) then pick a sensible default
+			$part=substr($original_comcode,0,$attachment['marker']);
+			if (strpos($part,'[attachment')!==false)
+			{
+				// TODO: Use this in v10 $part=substr($part,strrpos($part,'[attachment'));
+				$part=substr($part,strlen($part)-strpos(strrev($part),strrev('[attachment'))-strlen('[attachment'));
+			}
+			preg_match('#new_(\d+)[\[<]#',$part,$marker_matches);
+			$marker_id=array_key_exists(1,$marker_matches)?($marker_matches[1]):strval($i+1); // Should always exist, but if not (some weird internal Comcode parsing error -- this stuff is complex) then pick a sensible default
 
 			// If it's a new one, we need to change the comcode to reference the ID we made for it
 			if ($attachment['type']=='new')
 			{
-				$new_comcode=preg_replace('#(\[(attachment|attachment_safe)[^\]]*\])new_'.strval($marker_id).'(\[/)#','${1}'.strval($attachment['id']).'${3}',$new_comcode);
-				$new_comcode=preg_replace('#(<(attachment|attachment_safe)[^>]*>)new_'.strval($marker_id).'(</)#','${1}'.strval($attachment['id']).'${3}',$new_comcode);
+				$new_comcode=preg_replace('#(\[(attachment|attachment_safe)[^\]]*\])new_'.$marker_id.'(\[/)#','${1}'.strval($attachment['id']).'${3}',$new_comcode);
+				$new_comcode=preg_replace('#(<(attachment|attachment_safe)[^>]*>)new_'.$marker_id.'(</)#','${1}'.strval($attachment['id']).'${3}',$new_comcode);
 
 				if (!is_null($type))
 					$connection->query_insert('attachment_refs',array('r_referer_type'=>$type,'r_referer_id'=>$id,'a_id'=>$attachment['id']));
@@ -385,7 +392,7 @@ function do_comcode_attachments($original_comcode,$type,$id,$previewing_only=fal
 		$new_comcode=preg_replace('#\[(attachment|attachment_safe)[^\]]*\]new_\d+\[/attachment\]#','',$new_comcode);
 		$new_comcode=preg_replace('#<(attachment|attachment_safe)[^>]*>new_\d+</attachment>#','',$new_comcode);
 
-		if (!$previewing_only)
+		if ((!$previewing_only) && (get_value('disable_attachment_cleanup')!=='1'))
 		{
 			// Clear any de-referenced attachments
 			foreach ($before as $ref)

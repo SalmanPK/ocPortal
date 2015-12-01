@@ -821,9 +821,11 @@ function get_defined_functions()
  *
  * @param  PATH		Filename.
  * @param  string		Mode (e.g. at).
+ * @param  boolean	Use include path.
+ * @param  ?object	Context (NULL: no context).
  * @return ~resource The file handle (false: could not be opened).
  */
-function fopen($filename,$mode)
+function fopen($filename,$mode,$use_include_path=false,$context=NULL)
 {
 	return array();
 }
@@ -2734,9 +2736,10 @@ function pack($format,$arg1=NULL,$arg2=NULL,$arg3=NULL,$arg4=NULL,$arg5=NULL,$ar
  * Parse a URL and return its components.
  *
  * @param  string		The URL to parse.
- * @return ~array		A map of details about the URL (false: URL cannot be parsed).
+ * @param  integer	The component to get (-1 get all in an array).
+ * @return ~mixed		A map of details about the URL (false: URL cannot be parsed).
  */
-function parse_url($url)
+function parse_url($url,$component=-1)
 {
 	return array();
 }

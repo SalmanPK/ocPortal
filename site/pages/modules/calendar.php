@@ -550,8 +550,45 @@ class Module_calendar
 		}
 
 		// Nofollow stuff
-		$previous_no_follow=($previous_timestamp<filectime(get_file_base().'/info.php'));
-		$next_no_follow=($next_timestamp>time());
+		$previous_no_follow=($previous_timestamp<time()-60*60*24*31);
+		$test=$GLOBALS['SITE_DB']->query_value_null_ok_full('SELECT id FROM '.get_table_prefix().'calendar_events WHERE e_start_year='.date('Y',$next_timestamp).' AND e_start_month<='.date('m',$next_timestamp).' OR e_start_year<'.date('Y',$next_timestamp));
+		if (!is_null($test)) // if there really are events before, this takes priority
+		{
+			$previous_no_follow=false;
+		}
+		$next_no_follow=($next_timestamp>time()+60*60*24*31*6/*So can see 6 months of recurrences/empty space*/);
+		$test=$GLOBALS['SITE_DB']->query_value_null_ok_full('SELECT id FROM '.get_table_prefix().'calendar_events WHERE e_start_year='.date('Y',$next_timestamp).' AND e_start_month>='.date('m',$next_timestamp).' OR e_start_year>'.date('Y',$next_timestamp));
+		if (!is_null($test)) // if there really are events after, this takes priority
+		{
+			$next_no_follow=false;
+		}
+		if (/*get_bot_type()!==null Actually we can't rely on bot detection, so let's just tie to guest && */is_guest())
+		{
+			// Some bots ignore nofollow, so let's be more forceful
+			$past_no_follow=($timestamp<time()-60*60*24*31);
+			$test=$GLOBALS['SITE_DB']->query_value_null_ok_full('SELECT id FROM '.get_table_prefix().'calendar_events WHERE e_start_year='.date('Y',$timestamp).' AND e_start_month<='.date('m',$timestamp).' OR e_start_year<'.date('Y',$timestamp));
+			if (!is_null($test)) // if there really are events before, this takes priority
+			{
+				$past_no_follow=false;
+			}
+			$future_no_follow=($timestamp>time()+60*60*24*31*6/*So can see 6 months of recurrences/empty space*/);
+			$test=$GLOBALS['SITE_DB']->query_value_null_ok_full('SELECT id FROM '.get_table_prefix().'calendar_events WHERE e_start_year='.date('Y',$timestamp).' AND e_start_month>='.date('m',$timestamp).' OR e_start_year>'.date('Y',$timestamp));
+			if (!is_null($test)) // if there really are events after, this takes priority
+			{
+				$future_no_follow=false;
+			}
+			if ($past_no_follow || $future_no_follow)
+			{
+				global $EXTRA_HEAD;
+				$EXTRA_HEAD->attach('<meta name="robots" content="noindex" />'); // XHTMLXHTML
+				$GLOBALS['HTTP_STATUS_CODE']='401';
+				if (!headers_sent())
+				{
+					if ((!browser_matches('ie')) && (strpos(ocp_srv('SERVER_SOFTWARE'),'IIS')===false)) header('HTTP/1.0 401 Unauthorized'); // Stop spiders ever storing the URL that caused this
+				}
+				access_denied('NOT_AS_GUEST_CALENDAR_PERFORMANCE');
+			}
+      }
 
 		$map=array_merge($filter,array('page'=>'_SELF','view'=>$view,'id'=>$previous));
 		if (get_param_integer('member_id',get_member())!=get_member()) $map['member_id']=get_param_integer('member_id');
@@ -1365,7 +1402,7 @@ class Module_calendar
 			'publisher'=>'', // blank means same as creator
 			'modified'=>is_null($event['e_edit_date'])?'':date('Y-m-d',$event['e_edit_date']),
 			'type'=>'Calendar event',
-			'title'=>get_translated_text($event['e_title']),
+			'title'=>comcode_escape(get_translated_text($event['e_title'])),
 			'identifier'=>'_SEARCH:calendar:view:'.strval($id),
 			'description'=>get_translated_text($event['e_content']),
 			'image'=>find_theme_image('bigicons/calendar'),
@@ -1453,19 +1490,9 @@ class Module_calendar
 		$day=get_param('day','');
 		if ($day!='')
 		{
-			$event=adjust_event_dates_for_a_recurrence($day,$event);
+			$event=adjust_event_dates_for_a_recurrence($day,$event,get_users_timezone());
 		}
 		list($time_raw,$from)=find_event_start_timestamp($event);
-		if ($day!='')
-		{
-			if (date('Y-m-d',$from)!=$day) // Possibly the day given in URL is invalid due to a day shift across timezones, adjust if required and recalculate
-			{
-				$day_dif=$event['e_start_day']-intval(date('d',$from));
-				$event['e_start_day']+=$day_dif;
-				$event['e_end_day']+=$day_dif;
-				list($time_raw,$from)=find_event_start_timestamp($event);
-			}
-		}
 		$day_formatted=locale_filter(date(do_lang('calendar_date'),$from));
 		if ((!is_null($event['e_end_year'])) && (!is_null($event['e_end_month'])) && (!is_null($event['e_end_day'])))
 		{
@@ -1610,7 +1637,7 @@ class Module_calendar
 				list(,$to)=find_event_end_timestamp($event);
 			}
 
-			syndicate_described_activity('calendar:ACTIVITY_SUBSCRIBED_EVENT',get_translated_text($event['e_title']),date_range($from,$to,!is_null($event['e_start_hour'])),'','_SEARCH:calendar:view:'.strval($id),'','','calendar',1,NULL,true);
+			syndicate_described_activity('calendar:ACTIVITY_SUBSCRIBED_EVENT',get_translated_text($event['e_title']),date_range($from,$to,!is_null($event['e_start_hour']),make_nice_timezone_name($event['e_timezone'])),'','_SEARCH:calendar:view:'.strval($id),'','','calendar',1,NULL,true);
 		}
 
 		// Add next reminder to job system

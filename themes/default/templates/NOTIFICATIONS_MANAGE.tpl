@@ -20,13 +20,13 @@
 			{+START,IF_PASSED_AND_TRUE,SHOW_PRIVILEGES}
 				<th>
 					{$SET,url,{$BASE_URL}/data/gd_text.php?color={COLOR}&text={$ESCAPE,{!NOTIFICATION_PRIVILEGED},UL_ESCAPED}{$KEEP}}
-					<img src="{$GET*,url}" width="{$IMG_WIDTH*,{$GET,url},0,,1}" height="{$IMG_HEIGHT*,{$GET,url},0,,1}" title="{!NOTIFICATION_PRIVILEGED}" alt="{!NOTIFICATION_PRIVILEGED}" />
+					<img class="gd_text" src="{$GET*,url}" width="{$IMG_WIDTH*,{$GET,url},0,,1}" height="{$IMG_HEIGHT*,{$GET,url},0,,1}" title="{!NOTIFICATION_PRIVILEGED}" alt="{!NOTIFICATION_PRIVILEGED}" />
 				</th>
 			{+END}
 			{+START,LOOP,NOTIFICATION_TYPES_TITLES}
 				<th>
 					{$SET,url,{$BASE_URL}/data/gd_text.php?color={COLOR}&text={$ESCAPE,{LABEL},UL_ESCAPED}{$KEEP}}
-					<img src="{$GET*,url}" width="{$IMG_WIDTH*,{$GET,url},0,,1}" height="{$IMG_HEIGHT*,{$GET,url},0,,1}" title="" alt="{LABEL*}" />
+					<img class="gd_text" src="{$GET*,url}" width="{$IMG_WIDTH*,{$GET,url},0,,1}" height="{$IMG_HEIGHT*,{$GET,url},0,,1}" title="" alt="{LABEL*}" />
 				</th>
 			{+END}
 			<th></th>
@@ -53,7 +53,7 @@
 
 					<td class="associated_details">
 						{+START,IF,{SUPPORTS_CATEGORIES}}
-							<span class="associated_link"><a onclick="return open_link_as_overlay(this,null,null,'_self');" href="{$PAGE_LINK*,_SEARCH:notifications:advanced:notification_code={NOTIFICATION_CODE}:keep_su={MEMBER_ID}}">{!ADVANCED}</a></span>
+							<span class="associated_link"><a onclick="return open_link_as_overlay(this,null,null,'_self');" href="{$PAGE_LINK*,_SEARCH:notifications:advanced:notification_code={NOTIFICATION_CODE}{$?,{$NEQ,{MEMBER_ID},{$USER}},:keep_su={$USERNAME&,{MEMBER_ID}}}}">{$?,{$MOBILE},{!MORE},{!ADVANCED}}</a></span>
 						{+END}
 					</td>
 				</tr>

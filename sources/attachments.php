@@ -27,7 +27,7 @@ function attachments_script()
 	$site_closed=get_option('site_closed');
 	if (($site_closed=='1') && (!has_specific_permission(get_member(),'access_closed_site')) && (!$GLOBALS['IS_ACTUALLY_ADMIN']))
 	{
-		header('Content-Type: text/plain');
+		header('Content-Type: text/plain; charset='.get_charset());
 		@exit(get_option('closed'));
 	}
 
@@ -132,7 +132,7 @@ function attachments_script()
 	$from=0;
 	$new_length=$size;
 
-	@ini_set('zlib.output_compression','Off');
+	safe_ini_set('zlib.output_compression','Off');
 
 	// They're trying to resume (so update our range)
 	$httprange=ocp_srv('HTTP_RANGE');
@@ -169,7 +169,7 @@ function attachments_script()
 	if ($from==0)
 		$GLOBALS['SITE_DB']->query('UPDATE '.get_table_prefix().'values SET the_value=(the_value+'.strval((integer)$size).') WHERE the_name=\'download_bandwidth\'',1);
 
-	@ini_set('ocproducts.xss_detect','0');
+	safe_ini_set('ocproducts.xss_detect','0');
 
 	if (ocp_srv('REQUEST_METHOD')=='HEAD') return;
 
@@ -463,7 +463,7 @@ function render_attachment($tag,$attributes,$attachment,$pass_id,$source_member,
 				$temp_tpl=do_template('ATTACHMENT_SWF',map_keys_to_upper($attachment)+array('WYSIWYG_SAFE'=>($tag=='attachment')?NULL:true));
 				break;
 			}
-			elseif ((addon_installed('jwplayer')) && (($mime_type=='video/x-flv') || ($mime_type=='audio/x-mpeg') || ($mime_type=='video/mp4') || ($mime_type=='video/webm')))
+			elseif ((addon_installed('jwplayer')) && (($mime_type=='video/x-flv') || ($mime_type=='audio/mpeg') || ($mime_type=='video/mp4') || ($mime_type=='video/webm')))
 			{
 				$temp_tpl=do_template('ATTACHMENT_FLV',map_keys_to_upper($attachment)+array('WYSIWYG_SAFE'=>($tag=='attachment')?NULL:true));
 				break;

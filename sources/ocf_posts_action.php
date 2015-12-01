@@ -175,11 +175,23 @@ function ocf_make_post($topic_id,$title,$post,$skip_sig=0,$is_starter=false,$val
 	{
 		if ($check_permissions)
 		{
-			if (($info[0]['t_is_open']==0) && (!ocf_may_moderate_forum($forum_id))) access_denied('I_ERROR');
-
-			$last_member_id=$info[0]['t_cache_last_member_id'];
-			if ((!ocf_may_post_in_topic($forum_id,$topic_id,$last_member_id)) && (!$is_starter))
+			if (!has_category_access($poster,'forums',strval($forum_id)))
 				access_denied('I_ERROR');
+
+			$last_member_id=$is_starter?NULL:$info[0]['t_cache_last_member_id'];
+			$closed=$is_starter?false:($info[0]['t_is_open']==0);
+			if ((!ocf_may_post_in_topic($forum_id,$topic_id,$last_member_id,$closed,$poster,!is_null($intended_solely_for))) && (!$is_starter))
+				access_denied('I_ERROR');
+		}
+	}
+
+	// Ensure parent post is from the same topic
+	if (!is_null($parent_id))
+	{
+		$test_topic_id=$GLOBALS['FORUM_DB']->query_value_null_ok('f_posts','p_topic_id',array('id'=>$parent_id),' AND '.ocf_get_topic_where($topic_id,$poster));
+		if (is_null($test_topic_id))
+		{
+			$parent_id=NULL;
 		}
 	}
 
@@ -202,7 +214,7 @@ function ocf_make_post($topic_id,$title,$post,$skip_sig=0,$is_starter=false,$val
 
 	if (!addon_installed('unvalidated')) $validated=1;
 	$map=array(
-		'p_title'=>$title,
+		'p_title'=>substr($title,0,255),
 		'p_post'=>$lang_id,
 		'p_ip_address'=>$ip_address,
 		'p_time'=>$time,
@@ -405,10 +417,16 @@ function ocf_force_update_member_post_count($member_id,$member_post_count_dif=NU
 		{
 			if ($post_count_increment==1)
 			{
-				$member_post_count+=$GLOBALS['FORUM_DB']->query_value('f_posts','COUNT(*)',array('p_poster'=>$member_id,'p_cache_forum_id'=>$forum_id));
+				$where=array('p_poster'=>$member_id,'p_cache_forum_id'=>$forum_id);
+				if (addon_installed('unvalidated'))
+					$where['p_validated']=1;
+				$member_post_count+=$GLOBALS['FORUM_DB']->query_value('f_posts','COUNT(*)',$where);
 			}
 		}
-		$member_post_count+=$GLOBALS['FORUM_DB']->query_value('f_posts','COUNT(*)',array('p_poster'=>$member_id,'p_cache_forum_id'=>NULL));
+		$where=array('p_poster'=>$member_id,'p_cache_forum_id'=>NULL);
+		if (addon_installed('unvalidated'))
+			$where['p_validated']=1;
+		$member_post_count+=$GLOBALS['FORUM_DB']->query_value('f_posts','COUNT(*)',$where);
 		$GLOBALS['FORUM_DB']->query('UPDATE '.$GLOBALS['FORUM_DB']->get_table_prefix().'f_members SET m_cache_num_posts='.strval((integer)$member_post_count).' WHERE id='.strval((integer)$member_id));
 	}
 	else

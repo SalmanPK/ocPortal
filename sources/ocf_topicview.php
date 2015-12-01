@@ -278,6 +278,7 @@ function ocf_read_in_topic($topic_id,$start,$max,$view_poll_results=false,$check
 			}
 		}
 		$is_threaded=get_param_integer('threaded',(is_null($topic_info['f_is_threaded'])?0:$topic_info['f_is_threaded']));
+		if ($is_threaded!=1) $is_threaded=0; // In case of invalid URLs causing inconsistent handling
 
 		// Some general info
 		$out=array(
@@ -485,8 +486,10 @@ function ocf_read_in_topic($topic_id,$start,$max,$view_poll_results=false,$check
 	{
 		$out['last_poster']=$topic_info['t_cache_last_member_id'];
 		$out['last_post_id']=$topic_info['t_cache_last_post_id'];
-		if ((is_null($forum_id)) || (ocf_may_post_in_topic($forum_id,$topic_id,$topic_info['t_cache_last_member_id'])))
+		if (ocf_may_post_in_topic($forum_id,$topic_id,$topic_info['t_cache_last_member_id'],$topic_info['t_is_open']==0))
 			$out['may_reply']=true;
+		if (ocf_may_post_in_topic($forum_id,$topic_id,$topic_info['t_cache_last_member_id'],$topic_info['t_is_open']==0,NULL,true))
+			$out['may_reply_private_post']=true;
 		if (ocf_may_report_post()) $out['may_report_posts']=true;
 		if (ocf_may_make_private_topic()) $out['may_pt_members']=true;
 		if (ocf_may_edit_topics_by($forum_id,get_member(),$topic_info['t_cache_first_member_id'])) $out['may_edit_topic']=true;
@@ -504,7 +507,6 @@ function ocf_read_in_topic($topic_id,$start,$max,$view_poll_results=false,$check
 			if ($topic_info['t_sunk']==0) $out['may_sink_topic']=1; else $out['may_unsink_topic']=1;
 			if ($topic_info['t_cascading']==0) $out['may_cascade_topic']=1; else $out['may_uncascade_topic']=1;
 			$out['may_move_topic']=1;
-			$out['may_post_closed']=1;
 			$out['may_move_posts']=1;
 			$out['may_delete_posts']=1;
 			$out['may_validate_posts']=1;
@@ -536,7 +538,6 @@ function ocf_read_in_topic($topic_id,$start,$max,$view_poll_results=false,$check
 	{
 		$out['last_poster']=NULL;
 		$out['last_post_id']=NULL;
-		$out['may_reply']=false;
 	}
 
 	return $out;
@@ -613,6 +614,8 @@ function ocf_cache_member_details($members)
  */
 function ocf_render_post_buttons($topic_info,$_postdetails,$may_reply)
 {
+	$may_reply_private_post=array_key_exists('may_reply_private_post',$topic_info);
+
 	require_lang('ocf');
 	require_code('ocf_members2');
 	$buttons=new ocp_tempcode();
@@ -648,7 +651,7 @@ function ocf_render_post_buttons($topic_info,$_postdetails,$may_reply)
 		$_title->attach(do_lang_tempcode('ID_NUM',strval($_postdetails['id'])));
 		$javascript=NULL;
 
-		if ((array_key_exists('message_comcode',$_postdetails)) && (!is_null($_postdetails['message_comcode'])) && (strlen($_postdetails['message_comcode'])<1024*10/*10kb limit, for reasonable performance*/) && (!array_key_exists('intended_solely_for',$map)))
+		if ((array_key_exists('message_comcode',$_postdetails)) && (!is_null($_postdetails['message_comcode'])) && (strlen($_postdetails['message_comcode'])<1024*10/*10kb limit, for reasonable performance*/) && (array_key_exists('may_use_quick_reply',$topic_info)) && (!array_key_exists('intended_solely_for',$map)))
 		{
 			$javascript='return topic_reply('.($topic_info['is_threaded']?'true':'false').',this,\''.strval($_postdetails['id']).'\',\''.addslashes($_postdetails['poster_username']).'\',\''.str_replace(chr(10),'\n',addslashes(preg_replace('#\[staff_note\].*\[/staff_note\]#Us','',$_postdetails['message_comcode']))).'\',\''.str_replace(chr(10),'\n',addslashes(($topic_info['is_threaded']==0)?'':strip_comcode($_postdetails['message_comcode']))).'\');';
 		}
@@ -660,7 +663,7 @@ function ocf_render_post_buttons($topic_info,$_postdetails,$may_reply)
 		$_title=do_lang_tempcode('POINTS_THANKS');
 		$buttons->attach(do_template('SCREEN_ITEM_BUTTON',array('_GUID'=>'a66f98cb4d56bd0d64e9ecc44d357141','IMMEDIATE'=>false,'IMG'=>'points','TITLE'=>$_title,'URL'=>$action_url)));
 	}
-	if ((array_key_exists('may_pt_members',$topic_info)) && ($may_reply) && ($_postdetails['poster']!=get_member()) && ($_postdetails['poster']!=$GLOBALS['OCF_DRIVER']->get_guest_id()) && (ocf_may_whisper($_postdetails['poster'])) && (get_option('overt_whisper_suggestion')=='1'))
+	if ((array_key_exists('may_pt_members',$topic_info)) && ($may_reply_private_post) && ($_postdetails['poster']!=get_member()) && ($_postdetails['poster']!=$GLOBALS['OCF_DRIVER']->get_guest_id()) && (ocf_may_whisper($_postdetails['poster'])) && (get_option('overt_whisper_suggestion')=='1'))
 	{
 		$whisper_type=(get_value('no_inline_pp_advertise')==='1')?'new_pt':'whisper';
 		$action_url=build_url(array('page'=>'topics','type'=>$whisper_type,'id'=>$_postdetails['topic_id'],'quote'=>$_postdetails['id'],'intended_solely_for'=>$_postdetails['poster']),get_module_zone('topics'));

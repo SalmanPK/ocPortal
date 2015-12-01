@@ -120,8 +120,15 @@ class Module_admin
 	function _synonyms()
 	{
 		return array(
+			array('maximum','limit','total','max','increase','long'),
+			array('characters','words','bytes'),
+
+			array('delineate','delimit','delimitate','demarcate'),
+			array('order','sort'),
+			array('sudo','masquerade'),
 			array('multi-moderation','multimoderation'),
 			array('invitation','invite'),
+			array('social','forum'),
 			array('banner','advert','advertising','advertise'),
 			array('news','blogs','press release'),
 			array('check-in','workflow','validation','valid','approval','approved','live','accept','posted','online','active','activate','activation'),
@@ -129,13 +136,14 @@ class Module_admin
 			array('uninstall','disable','remove'),
 			array('pruning','prune','lurkers'),
 			array('colour','color','css','font','background'),
-			array('dob','date of birth'),
+			array('dob','date of birth','age'),
 			array('sef','seo','google','search engine','search-engine-friendly','search-engine-optimisation'),
 			array('ban','suspend','suspension','probation','warn','punish','punitive'),
 			array('staff','moderator','admin', 'administrator','operator'),
 			array('open','closed','live','activate','activation',/*'enable',*/'turn'),
 			array('iotd','potd','image of the day'),
-			array('import','convert','migrate','upload'),
+			array('import','convert','migrate'),
+			array('attachment','upload'),
 			array('export','download'),
 			array('email','e-mail'),
 			array('center','centre'),
@@ -143,7 +151,7 @@ class Module_admin
 			array('atom','rss','feed'),
 			array('login','logon','log-in','log-on'),
 			array('redirect','move'),
-			array('gallery','album'),
+			array('gallery','album','podcast'),
 			array('audit','log','usage'),
 			array('download','file','document'),
 			array('page','article','comcode'),
@@ -151,15 +159,15 @@ class Module_admin
 			array('category','node','section','repository'),
 			array('catalogue','database','classified','catalog'),
 			array('speed','slow','fast','optimisation','performance','efficiency'),
-			array('panel','sidebar','frame'),
+			array('panel','sidebar','frame','bar'),
 			array('usergroup','group','promote','rank'),
 			array('member','user'),
 			array('profile','account','memberaccount'),
-			array('permission','privilege','authorisation','authorization','right'),
+			array('permission','privilege','authorisation','authorization','right','grant','assign'),
 			array('overlay','popup','dialog','window'),
 			array('option','setting','value'),
 			array('configure','setup','install'),
-			array('emoticon','smiley','face'),
+			array('emoticon','smiley','face','emoji'),
 			array('forum','board','bbs'),
 			array('thread','topic'),
 			array('karma','point'),
@@ -168,9 +176,9 @@ class Module_admin
 			array('html','xhtml'),
 			array('addon','add-on','mod','hack','extension','plugin','module','system'),
 			array('cedi','wiki','seedy'),
-			array('name','title'),
+			array('name','title','label',''/*May be a stop word*/),
 			array('analytics','statistics','hits'),
-			array('newsletter','mass-mail','mass-mailing','bulletin','mail-merge'),
+			array('newsletter','mass-mail','mass-mailing','bulletin','mail-merge','announcement'),
 			array('description','caption','summary'),
 			array('choose','set'),
 			array('add','submit','create','make'),
@@ -330,12 +338,12 @@ class Module_admin
 		{
 			return do_template('INDEX_SCREEN_FANCIER_SCREEN',array('TITLE'=>get_screen_title('ADMIN_ZONE_SEARCH_RESULTS'),'EMPTY'=>true,'ARRAY'=>true,'CONTENT'=>'','PRE'=>'','POST'=>''));
 		}
-		$keywords=array();
+		$keywords=array(); // Keyword groups
 		$synonym_rows=$this->_synonyms(); // Only in English by default. To do for another language, override this file using inheritance
 		$section_limitations=array();
 		foreach ($_keywords as $xi=>$keyword)
 		{
-			$_keywords=array();
+			$__keywords=array();
 			$keyword=trim($keyword);
 			if ($keyword=='') continue;
 
@@ -349,12 +357,24 @@ class Module_admin
 			{
 				if ((in_array(strtolower($keyword),$synonyms)) || ((array_key_exists($xi+1,$_keywords)) && (in_array(strtolower($_keywords[$xi].' '.$_keywords[$xi+1]),$synonyms))))
 				{
-					$_keywords=array_merge($_keywords,$synonyms);
+					if (in_array('',$synonyms))
+					{
+						foreach ($synonyms as $synonym)
+						{
+							if (($synonym!='') || (count($_keywords)>2/*Stop word only if longish search*/))
+							{
+								$__keywords[]=$synonym;
+							}
+						}
+					} else
+					{
+						$__keywords=array_merge($__keywords,$synonyms);
+					}
 				}
 			}
 
-			$_keywords[]=$keyword;
-			$keywords[]=$_keywords;
+			$__keywords[]=$keyword;
+			$keywords[]=$__keywords;
 		}
 
 		// Stemming, if available (needs Stemmer class like http://www.chuggnutt.com/stemmer-source.php which we can't redistribute due to it being GPL not LGPL)
@@ -532,12 +552,15 @@ class Module_admin
 					}
 
 					$n=do_lang('MODULE_TRANS_NAME_'.$page,NULL,NULL,NULL,NULL,false);
-					if (($this->_keyword_match($n)) && (has_actual_page_access(get_member(),$page,$zone)))
+					if (!is_null($n))
 					{
-						$_url=build_url(array('page'=>$page),$zone);
-						$site_tree_editor_url=build_url(array('page'=>'admin_sitetree','type'=>'site_tree','id'=>$zone.':'.$page),'adminzone');
-						$permission_tree_editor_url=build_url(array('page'=>'admin_permissions','id'=>$zone.':'.$page),'adminzone');
-						$content[$current_results_type]->attach(do_template('INDEX_SCREEN_FANCIER_ENTRY',array('NAME'=>$n,'URL'=>$_url,'TITLE'=>'','DESCRIPTION'=>do_lang_tempcode('FIND_IN_SITE_TREE_EDITOR',escape_html($site_tree_editor_url->evaluate()),escape_html($permission_tree_editor_url->evaluate())))));
+						if (($this->_keyword_match($n)) && (has_actual_page_access(get_member(),$page,$zone)))
+						{
+							$_url=build_url(array('page'=>$page),$zone);
+							$site_tree_editor_url=build_url(array('page'=>'admin_sitetree','type'=>'site_tree','id'=>$zone.':'.$page),'adminzone');
+							$permission_tree_editor_url=build_url(array('page'=>'admin_permissions','id'=>$zone.':'.$page),'adminzone');
+							$content[$current_results_type]->attach(do_template('INDEX_SCREEN_FANCIER_ENTRY',array('NAME'=>$n,'URL'=>$_url,'TITLE'=>'','DESCRIPTION'=>do_lang_tempcode('FIND_IN_SITE_TREE_EDITOR',escape_html($site_tree_editor_url->evaluate()),escape_html($permission_tree_editor_url->evaluate())))));
+						}
 					}
 				}
 			}
@@ -590,6 +613,8 @@ class Module_admin
 
 				if (!is_null($null_test))
 				{
+					$_n=do_lang($p['human_name'],NULL,NULL,NULL,NULL,false);
+					if (is_null($_n)) continue;
 					$n=do_lang_tempcode($p['human_name']);
 					switch ($p['the_name'])
 					{
@@ -778,7 +803,7 @@ class Module_admin
 			$all_blocks=find_all_blocks();
 			foreach (array_keys($all_blocks) as $p)
 			{
-				$t=do_lang('BLOCK_'.$p.'_DESCRIPTION');
+				$t=do_lang('BLOCK_'.$p.'_DESCRIPTION',NULL,NULL,NULL,NULL,false);
 				if (($this->_keyword_match($p)) || ($this->_keyword_match($t)))
 				{
 					$url='';
@@ -1092,7 +1117,7 @@ class Module_admin
 					$lang=$image['lang'];
 					$lang_map=better_parse_ini_file(file_exists(get_file_base().'/lang_custom/langs.ini')?(get_file_base().'/lang_custom/langs.ini'):(get_file_base().'/lang/langs.ini'));
 					$lang=array_key_exists($lang,$lang_map)?$lang_map[$lang]:$lang;
-					$content[$current_results_type]->attach(do_template('INDEX_SCREEN_FANCIER_ENTRY',array('_GUID'=>'68b418db6d3f7676cf1682a68f76f88a','NAME'=>$n,'URL'=>$_url,'TITLE'=>'','DESCRIPTION'=>$lang,'SUP'=>$sup)));
+					$content[$current_results_type]->attach(do_template('INDEX_SCREEN_FANCIER_ENTRY',array('_GUID'=>'68b418db6d3f7676cf1682a68f76f88a','NAME'=>$n,'URL'=>$_url,'TITLE'=>'','DESCRIPTION'=>escape_html($lang),'SUP'=>$sup)));
 				}
 			}
 		}

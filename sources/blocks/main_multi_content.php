@@ -326,7 +326,20 @@ class Block_main_multi_content
 					}
 				} else
 				{
-					$rows=$info['connection']->query('SELECT r.*'.$extra_select_sql.' '.$query.' ORDER BY r.'.$info['id_field'].' ASC',$max,NULL);
+					$sql='SELECT r.*'.$extra_select_sql.' '.$query;
+					if (is_string($info['id_field']))
+					{
+						$sql.=' ORDER BY r.'.$info['id_field'].' ASC';
+					} else
+					{
+						$sql.=' ORDER BY ';
+						foreach ($info['id_field'] as $i=>$id_field)
+						{
+							if ($i!=0) $sql.=',';
+							$sql.='r.'.$id_field.' ASC';
+						}
+					}
+					$rows=$info['connection']->query($sql,$max,NULL);
 				}
 				break;
 			default:
@@ -551,7 +564,7 @@ class Block_main_multi_content
 	function build_filter($filter,$info,$category_field_filter)
 	{
 		$parent_spec__table_name=array_key_exists('parent_spec__table_name',$info)?$info['parent_spec__table_name']:$info['table'];
-		$parent_field_name=array_key_exists('parent_field_name',$info)?$info['parent_field_name']:NULL;
+		$parent_field_name=array_key_exists('parent_field_name',$info)?('r.'.$info['parent_field_name']):NULL;
 		if (is_null($parent_field_name)) $parent_spec__table_name=NULL;
 		$parent_spec__parent_name=array_key_exists('parent_spec__parent_name',$info)?$info['parent_spec__parent_name']:NULL;
 		$parent_spec__field_name=array_key_exists('parent_spec__field_name',$info)?$info['parent_spec__field_name']:NULL;

@@ -179,7 +179,7 @@ class Module_admin_quiz
 		$fields->attach(form_input_list(do_lang_tempcode('QUIZ'),'','id',$entries,NULL,true));
 
 		$post_url=build_url(array('page'=>'_SELF','type'=>'_find_winner'),'_SELF');
-		$submit_name=do_lang_tempcode('CHOOSE_WINNERS');
+		$submit_name=do_lang_tempcode('PROCEED');
 		$text=do_lang_tempcode('CHOOSE_WINNERS');
 
 		breadcrumb_set_self(do_lang_tempcode('CHOOSE'));
@@ -265,16 +265,16 @@ class Module_admin_quiz
 			switch ($i)
 			{
 				case 0:
-					$name=do_lang_tempcode('WINNER_FIRST',integer_format($i+1),$GLOBALS['FORUM_DRIVER']->get_username($member_id));
+					$name=do_lang_tempcode('WINNER_FIRST',escape_html(integer_format($i+1)),escape_html($GLOBALS['FORUM_DRIVER']->get_username($member_id)));
 					break;
 				case 1:
-					$name=do_lang_tempcode('WINNER_SECOND',integer_format($i+1),$GLOBALS['FORUM_DRIVER']->get_username($member_id));
+					$name=do_lang_tempcode('WINNER_SECOND',escape_html(integer_format($i+1)),escape_html($GLOBALS['FORUM_DRIVER']->get_username($member_id)));
 					break;
 				case 2:
-					$name=do_lang_tempcode('WINNER_THIRD',integer_format($i+1),$GLOBALS['FORUM_DRIVER']->get_username($member_id));
+					$name=do_lang_tempcode('WINNER_THIRD',escape_html(integer_format($i+1)),escape_html($GLOBALS['FORUM_DRIVER']->get_username($member_id)));
 					break;
 				default:
-					$name=do_lang_tempcode('WINNER',integer_format($i+1),$GLOBALS['FORUM_DRIVER']->get_username($member_id));
+					$name=do_lang_tempcode('WINNER',escape_html(integer_format($i+1)),escape_html($GLOBALS['FORUM_DRIVER']->get_username($member_id)));
 					break;
 			}
 			$_winners->attach(do_template('INDEX_SCREEN_ENTRY',array('_GUID'=>'85f558c8dc99b027dbf4de821de0e419','URL'=>$url,'NAME'=>$name,'TARGET'=>'_blank')));
@@ -284,7 +284,7 @@ class Module_admin_quiz
 
 		// Show the winners
 		$title=get_screen_title('FIND_WINNERS');
-		return do_template('INDEX_SCREEN',array('_GUID'=>'d427ec7300a325ee4f00020ea59468e2','TITLE'=>$title,'CONTENT'=>$_winners,'PRE'=>do_lang_tempcode('WINNERS_FOUND_AS_FOLLOWS'),'POST'=>''));
+		return do_template('INDEX_SCREEN',array('_GUID'=>'d427ec7300a325ee4f00020ea59468e2','TITLE'=>$title,'CONTENT'=>$_winners,'PRE'=>do_lang_tempcode('WINNERS_FOUND_AS_FOLLOWS'),'POST'=>do_lang_tempcode('WINNERS_HANDLING')));
 	}
 
 	/**

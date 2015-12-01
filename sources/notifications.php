@@ -217,6 +217,8 @@ class Notification_dispatcher
 
 		if (($this->store_in_staff_messaging_system) && (addon_installed('staff_messaging')))
 		{
+			require_lang('messaging');
+
 			list($type,$id)=explode('_',$this->code_category,2);
 			$message_url=build_url(array('page'=>'admin_messaging','type'=>'view','id'=>$id,'message_type'=>$type),get_module_zone('admin_messaging'),NULL,false,false,true);
 			$message=do_lang('MESSAGING_NOTIFICATION_WRAPPER',$message,$message_url->evaluate());
@@ -522,15 +524,25 @@ function enable_notifications($notification_code,$notification_category,$member_
 	if (is_null($member_id)) $member_id=get_member();
 	if (is_guest($member_id)) return;
 
+	$db=(substr($notification_code,0,4)=='ocf_')?$GLOBALS['FORUM_DB']:$GLOBALS['SITE_DB'];
+
 	if (is_null($setting))
 	{
 		$ob=_get_notification_ob_for_code($notification_code);
+		if (is_null($ob)) warn_exit(do_lang_tempcode('INTERNAL_ERROR'));
 		$setting=$ob->get_default_auto_setting($notification_code,$notification_category);
 		if (!_notification_setting_available($setting,$member_id))
 			$setting=_find_member_statistical_notification_type($member_id);
+	} else
+	{
+		// Check there is actually something to do here (when saving notifications tab usually everything will be still the same)
+		$test=$db->query_value_null_ok('notifications_enabled','l_setting',array(
+			'l_member_id'=>$member_id,
+			'l_notification_code'=>substr($notification_code,0,80),
+			'l_code_category'=>is_null($notification_category)?'':$notification_category,
+		));
+		if ($test===$setting) return;
 	}
-
-	$db=(substr($notification_code,0,4)=='ocf_')?$GLOBALS['FORUM_DB']:$GLOBALS['SITE_DB'];
 
 	$db->query_delete('notifications_enabled',array(
 		'l_member_id'=>$member_id,

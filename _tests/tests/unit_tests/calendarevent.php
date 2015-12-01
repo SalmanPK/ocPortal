@@ -28,10 +28,46 @@ class calendarevent_test_set extends ocp_test_case
 		require_code('calendar2');
 	}
 
+	function testAllDayInAheadTimeZone()
+	{
+		// Amsterdam-timezone event, which is *ahead* of UTC, so potentially could cause problems if we make a mistake (as it starts the previous day from the UTC perspective)
+
+		$period_start=mktime(0,0,0,4,6,2015);
+		$period_end=mktime(23,59,0,4,6,2015);
+
+		// Check in USA
+		$_period_start=2*$period_start-tz_time($period_start,'America/New_York');
+		$_period_end=2*$period_end-tz_time($period_end,'America/New_York');
+		$periods=find_periods_recurrence('Europe/Amsterdam',0,2015,4,6,'day_of_month',NULL,NULL,NULL,NULL,NULL,'day_of_month',NULL,NULL,'none',NULL,$_period_start,$_period_end);
+		$this->assertTrue(count($periods)==1); // We expect to see it as it starts this day in USA point of view
+
+		// Check in Amsterdam
+		$_period_start=2*$period_start-tz_time($period_start,'Europe/Amsterdam');
+		$_period_end=2*$period_end-tz_time($period_end,'Europe/Amsterdam');
+		$periods=find_periods_recurrence('Europe/Amsterdam',0,2015,4,6,'day_of_month',NULL,NULL,NULL,NULL,NULL,'day_of_month',NULL,NULL,'none',NULL,$_period_start,$_period_end);
+		$this->assertTrue(count($periods)==0); // We expect to *not* see it, as the day is actually different
+
+		$period_start=mktime(0,0,0,4,7,2015);
+		$period_end=mktime(23,59,0,4,7,2015);
+
+		// Check in USA
+		$_period_start=2*$period_start-tz_time($period_start,'America/New_York');
+		$_period_end=2*$period_end-tz_time($period_end,'America/New_York');
+		$periods=find_periods_recurrence('Europe/Amsterdam',0,2015,4,6,'day_of_month',NULL,NULL,NULL,NULL,NULL,'day_of_month',NULL,NULL,'none',NULL,$_period_start,$_period_end);
+		$this->assertTrue(count($periods)==1); // We expect to see it because it hasn't finished yet
+
+		// Check in Amsterdam
+		$_period_start=2*$period_start-tz_time($period_start,'Europe/Amsterdam');
+		$_period_end=2*$period_end-tz_time($period_end,'Europe/Amsterdam');
+		$periods=find_periods_recurrence('Europe/Amsterdam',0,2015,4,6,'day_of_month',NULL,NULL,NULL,NULL,NULL,'day_of_month',NULL,NULL,'none',NULL,$_period_start,$_period_end);
+		$this->assertTrue(count($periods)==1); // We expect to see it
+	}
+
 	function testApiShiftRecurrence()
 	{
 		// Given an event shifted to a different recurrence, ensure the dates do shift correctly...
 		$event=array(
+			
 			'e_start_day'=>8,
 			'e_start_month'=>10,
 			'e_start_year'=>2012,
@@ -49,9 +85,32 @@ class calendarevent_test_set extends ocp_test_case
 			'e_recurrence'=>'monthly',
 			'e_recurrences'=>NULL,
 		);
-		$event=adjust_event_dates_for_a_recurrence('2012-11-8',$event);
+		$event=adjust_event_dates_for_a_recurrence('2012-11-9',$event,'Europe/London');
 		$this->assertTrue($event['e_start_month']==11);
 		$this->assertTrue($event['e_end_month']==11);
+
+		// And now check timezones are respected for a negative timezone case viewed from the same timezone it was added in...
+
+		$event=array(
+			'e_start_day'=>30, // 29th local time
+			'e_start_month'=>7,
+			'e_start_year'=>2015,
+			'e_start_monthly_spec_type'=>'day_of_month',
+			'e_start_hour'=>1, // 21 local time
+			'e_start_minute'=>00,
+			'e_end_day'=>NULL,
+			'e_end_month'=>NULL,
+			'e_end_year'=>NULL,
+			'e_end_monthly_spec_type'=>NULL,
+			'e_end_hour'=>NULL,
+			'e_end_minute'=>NULL,
+			'e_timezone'=>'America/Guyana',
+			'e_do_timezone_conv'=>1,
+			'e_recurrence'=>'',
+			'e_recurrences'=>NULL,
+		);
+		$event=adjust_event_dates_for_a_recurrence('2015-07-29',$event,'America/Guyana');
+		$this->assertTrue($event['e_start_day']==30);
 
 		// More complex case...
 
@@ -73,7 +132,7 @@ class calendarevent_test_set extends ocp_test_case
 			'e_recurrence'=>'monthly',
 			'e_recurrences'=>NULL,
 		);
-		$event=adjust_event_dates_for_a_recurrence('2012-12-4',$event); // 1st Tuesday of December 2012
+		$event=adjust_event_dates_for_a_recurrence('2012-12-4',$event,'Europe/London'); // 1st Tuesday of December 2012
 		$this->assertTrue($event['e_start_day']==4); // 1st Tuesday of December = 4th
 		$this->assertTrue($event['e_start_month']==12);
 		$this->assertTrue($event['e_start_monthly_spec_type']=='day_of_month');
@@ -137,13 +196,13 @@ class calendarevent_test_set extends ocp_test_case
 	function testApiFindsCorrectTimezonedStart()
 	{
 		$timestamp=cal_get_start_utctime_for_event('Europe/London'/*i.e. BST/DTC*/,2012,8,10,'day_of_month',NULL,NULL,true);
-		$this->assertTrue(mktime(23,0,0,8,9,2012)==$timestamp);
+		$this->assertTrue(mktime(23,0,0,8,10,2012)==$timestamp);
 	}
 
 	function testApiFindsCorrectTimezonedEnd()
 	{
 		$timestamp=cal_get_end_utctime_for_event('Europe/London'/*i.e. BST/DTC*/,2012,8,10,'day_of_month',NULL,NULL,true);
-		$this->assertTrue(mktime(22,59,0,8,10,2012)==$timestamp);
+		$this->assertTrue(mktime(22,59,0,8,11,2012)==$timestamp);
 	}
 
 	function testApiFindsCorrectTimezonedStart2()

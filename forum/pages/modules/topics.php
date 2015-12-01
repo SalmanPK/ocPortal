@@ -140,6 +140,7 @@ class Module_topics
 			'birthday',
 			'make_personal',
 			'_make_personal',
+			'validate_topics',
 			'pin_topics',
 			'unpin_topics',
 			'sink_topics',
@@ -599,6 +600,32 @@ class Module_topics
 		}
 
 		return $this->redirect_to_forum('MARK_UNREAD',$forum_id);
+	}
+
+	/**
+	 * The actualiser to validate topics.
+	 *
+	 * @return tempcode		The UI
+	 */
+	function validate_topics() // Type
+	{
+		require_code('ocf_topics_action');
+		require_code('ocf_topics_action2');
+
+		$topics=$this->get_markers();
+		if (count($topics)==0) warn_exit(do_lang_tempcode('NO_MARKERS_SELECTED'));
+
+		$forum_id=NULL;
+		foreach ($topics as $i=>$topic_id)
+		{
+			if ($i==0)
+			{
+				$forum_id=$GLOBALS['FORUM_DB']->query_value('f_topics','t_forum_id',array('id'=>$topic_id));
+			}
+			ocf_edit_topic($topic_id,NULL,NULL,1,NULL,NULL,NULL,NULL,'');
+		}
+
+		return $this->redirect_to_forum('VALIDATE_TOPICS',$forum_id);
 	}
 
 	/**
@@ -1171,7 +1198,7 @@ class Module_topics
 					access_denied('I_ERROR');
 				elseif ((!has_specific_permission(get_member(),'view_other_pt')) && ($_postdetails[0]['p_intended_solely_for']!=get_member()) && ($_postdetails[0]['p_poster']!=get_member()) && (!is_null($_postdetails[0]['p_intended_solely_for'])))
 					access_denied('I_ERROR');
-				if ((!has_specific_permission(get_member(),'see_unvalidated')) && (!$_postdetails[0]['p_validated']) && (($_postdetails[0]['p_poster']!=get_member()) || ((is_guest($_postdetails[0]['p_poster'])) && ($_postdetails[0]['p_ip_address']!=get_ip_address()))))
+				if ((!has_specific_permission(get_member(),'see_unvalidated')) && ($_postdetails[0]['p_validated']==0) && (($_postdetails[0]['p_poster']!=get_member()) || ((is_guest($_postdetails[0]['p_poster'])) && ($_postdetails[0]['p_ip_address']!=get_ip_address()))))
 					access_denied('I_ERROR');
 
 				$_topic=$GLOBALS['FORUM_DB']->query_select('f_topics',array('t_pt_to','t_pt_from','t_cache_first_title'),array('id'=>$_postdetails[0]['p_topic_id']),'',1);
@@ -1572,6 +1599,16 @@ class Module_topics
 			$post=$this->attach_quotes($quotes);
 		}
 
+		$whisperer=$GLOBALS['FORUM_DB']->query_value_null_ok('f_posts','p_poster',array('p_topic_id'=>$topic_id,'p_intended_solely_for'=>get_member()),'ORDER BY p_time DESC');
+		if (!is_null($whisperer))
+		{
+			$_whisperer=$GLOBALS['FORUM_DRIVER']->get_username($whisperer);
+			if (!is_null($_whisperer))
+			{
+				attach_message(do_lang_tempcode('TOPIC_HAS_WHISPER_TO_YOU',escape_html($_whisperer)),'notice');
+			}
+		}
+
 		$topic_info=$GLOBALS['FORUM_DB']->query_select('f_topics',array('*'),array('id'=>$topic_id),'',1);
 		if (!array_key_exists(0,$topic_info)) warn_exit(do_lang_tempcode('MISSING_RESOURCE'));
 		$forum_id=$topic_info[0]['t_forum_id'];
@@ -1666,7 +1703,7 @@ class Module_topics
 
 		if (is_guest())
 		{
-			$specialisation->attach(form_input_line(do_lang_tempcode('_DESCRIPTION_NAME'),'','poster_name_if_guest',do_lang('GUEST'),true));
+			$specialisation->attach(form_input_line(do_lang_tempcode('GUEST_NAME'),'','poster_name_if_guest',do_lang('GUEST'),true));
 		}
 
 		require_code('fields');
@@ -1766,6 +1803,8 @@ class Module_topics
 	 */
 	function report_post() // Type
 	{
+		if (!ocf_may_report_post()) access_denied('I_ERROR');
+
 		$post_id=get_param_integer('id');
 
 		$post_info=$GLOBALS['FORUM_DB']->query_select('f_posts',array('*'),array('id'=>$post_id),'',1);
@@ -1904,17 +1943,21 @@ class Module_topics
 		if ($poster_name_if_guest=='') $poster_name_if_guest=NULL;
 		if (!is_null($poster_name_if_guest))
 		{
+			$poster_name_if_guest=trim($poster_name_if_guest);
 			$restricted_usernames=explode(',',get_option('restricted_usernames'));
-			$restricted_usernames[]=do_lang('GUEST');
 			$restricted_usernames[]=do_lang('UNKNOWN');
 			$restricted_usernames[]=do_lang('SYSTEM');
+			if (!is_null($GLOBALS['FORUM_DRIVER']->get_member_from_username($poster_name_if_guest)))
+			{
+				$restricted_usernames[]=$poster_name_if_guest;
+			}
 			foreach ($restricted_usernames as $_restricted_username)
 			{
 				$restricted_username=trim($_restricted_username);
 				if ($restricted_username=='') continue;
-				if (strpos($poster_name_if_guest,$restricted_username)!==false)
+				if ($poster_name_if_guest==$restricted_username)
 				{
-					$poster_name_if_guest=NULL;
+					$poster_name_if_guest=$poster_name_if_guest.' ('.do_lang('GUEST').')';
 					break;
 				}
 			}
@@ -1957,6 +2000,8 @@ class Module_topics
 			}
 			elseif ($forum_id==-2) // New reported post topic
 			{
+				if (!ocf_may_report_post()) access_denied('I_ERROR');
+
 				$forum_id=$GLOBALS['FORUM_DRIVER']->forum_id_from_name(get_option('reported_posts_forum'));
 				if (is_null($forum_id)) warn_exit(do_lang_tempcode('NO_REPORTED_POST_FORUM'));
 
@@ -1972,6 +2017,8 @@ class Module_topics
 
 				$_title=get_screen_title('REPORT_POST');
 				$check_permissions=false;
+
+				decache('main_staff_checklist');
 			} else // New topic
 			{
 				$topic_id=ocf_make_topic($forum_id,post_param('description',''),post_param('emoticon',''),$topic_validated,post_param_integer('open',0),post_param_integer('pinned',0),$sunk,post_param_integer('cascading',0));
@@ -2125,6 +2172,21 @@ END;
 			if ($validated!=0) $url.='#post_'.strval($post_id);
 		}
 
+		if ($forum_id>=0)
+		{
+			$topic_validated=$GLOBALS['FORUM_DB']->query_value('f_topics','t_validated',array('id'=>$topic_id));
+			if (($topic_validated==0) && (!has_specific_permission(get_member(),'jump_to_unvalidated')))
+			{
+				$map=array('page'=>'forumview','id'=>$forum_id);
+				$test=get_param_integer('kfs'.(is_null($forum_id)?'':strval($forum_id)),-1);
+				if (($test!=-1) && ($test!=0)) $map['kfs'.(is_null($forum_id)?'':strval($forum_id))]=$test;
+				$test=get_param_integer('threaded',-1);
+				if ($test!=-1) $map['threaded']=$test;
+				$_url=build_url($map,get_module_zone('forumview'));
+				$url=$_url->evaluate();
+			}
+		}
+
 		if (($new_topic) && ($forum_id==-1))
 		{
 			require_code('notifications');
@@ -2135,7 +2197,7 @@ END;
 			{
 				enable_notifications('ocf_topic',strval($topic_id),$invited_member);
 
-				ocf_invite_to_pt(intval($invited_member),$topic_id);
+				ocf_invite_to_pt($invited_member,$topic_id);
 			}
 		}
 
@@ -2695,34 +2757,45 @@ END;
 		$javascript="
 			var form=document.getElementById('post').form;
 			form.old_submit=form.onsubmit;
-			form.onsubmit=function()
+			form.onsubmit=function() {
+				var post=form.elements['post'];
+				var text_value;
+				if (is_wysiwyg_field(post))
 				{
-					var post=form.elements['post'];
-					if ((!post.value) && (post[1])) post=post[1];
-					if (post.value.length>".strval($size).")
+					try
 					{
-						window.fauxmodal_alert('".php_addslashes(do_lang('_POST_TOO_LONG'))."');
-						return false;
+						text_value=window.CKEDITOR.instances['post'].getData();
 					}
+					catch (e) {};
+				} else
+				{
+					if ((!post.value) && (post[1])) post=post[1];
+					text_value=post.value;
+				}
+				if (text_value.length>".strval($size).")
+				{
+					window.fauxmodal_alert('".php_addslashes(do_lang('_POST_TOO_LONG'))."');
+					return false;
+				}
 		";
 
 		$stub=unixify_line_format(either_param('stub',''));
 		if ($stub!='') $javascript.="
-					var df='".str_replace(chr(10),'\n',addslashes($stub))."';
+				var df='".str_replace(chr(10),'\n',addslashes($stub))."';
 
-					var pv=post.value;
-					if ((post) && (pv.substring(0,df.length)==df))
-					{
-						pv=pv.substring(df.length,pv.length);
-					}
-					post.value=pv;
+				var pv=post.value;
+				if ((post) && (pv.substring(0,df.length)==df))
+				{
+					pv=pv.substring(df.length,pv.length);
+				}
+				post.value=pv;
 		";
 
 		$javascript.="
-					if (typeof form.old_submit!='undefined' && form.old_submit) return form.old_submit();
+				if (typeof form.old_submit!='undefined' && form.old_submit) return form.old_submit();
 
-					return true;
-				};
+				return true;
+			};
 		";
 
 		return $javascript;
@@ -2844,6 +2917,11 @@ END;
 		if (!array_key_exists(0,$topic_info)) warn_exit(do_lang_tempcode('MISSING_RESOURCE'));
 		$forum_id=$topic_info[0]['t_forum_id'];
 		$private_topic=is_null($forum_id);
+
+		if (($topic_info[0]['t_validated']==1) && ($GLOBALS['FORUM_DB']->query_value('f_posts','p_validated',array('id'=>$topic_info[0]['t_cache_first_post_id']))==0))
+		{
+			attach_message(do_lang_tempcode('FIRST_POST_IS_UNVALIDATED'),'inform');
+		}
 
 		$this->handle_topic_breadcrumbs($forum_id,$topic_id,$topic_info[0]['t_cache_first_title'],do_lang_tempcode('EDIT_TOPIC'));
 

@@ -104,6 +104,8 @@ function _build_keep_post_fields($exclude=NULL)
 	$out='';
 	foreach ($_POST as $key=>$val)
 	{
+		if (is_integer($key)) $key=strval($key);
+
 		if ((!is_null($exclude)) && (in_array($key,$exclude))) continue;
 
 		if (count($_POST)>80)
@@ -133,8 +135,13 @@ function _url_to_filename($url_full)
 		if ($bad_char==':') $good_char=';'; // So pagelinks save nice
 		$new_name=str_replace($bad_char,$good_char,$new_name);
 	}
-	if (strlen($new_name)<=255) return $new_name;
-	return md5($new_name); // Non correspondance, but at least we have something
+
+	if (strlen($new_name)<=200/*technically 256 but something may get put on the start, so be cautious*/)
+		return $new_name;
+
+	// Non correspondance, but at least we have something
+	if (strpos($new_name,'.')===false) return md5($new_name);
+	return md5($new_name).'.'.get_file_extension($new_name);
 }
 
 /**
@@ -224,7 +231,7 @@ function _fixup_protocolless_urls($in)
 
 	$in=remove_url_mistakes($in); // Chain in some other stuff
 
-	if (strpos($in,'://')!==false) return $in; // Absolute
+	if (strpos($in,':')!==false) return $in; // Absolute (e.g. http:// or mailto:)
 
 	if (substr($in,0,1)=='#') return $in;
 	if (substr($in,0,1)=='%') return $in;
@@ -285,6 +292,7 @@ function _url_to_pagelink($url,$abs_only=false,$perfect_only=true)
 		$slash_pos=false;
 	}
 	$parsed_url['path']=($slash_pos===false)?substr($parsed_url['path'],1):substr($parsed_url['path'],$slash_pos+1); // everything AFTER the zone
+	$parsed_url['path']=preg_replace('#/index\.php$#','',$parsed_url['path']);
 	$attributes=array();
 	$attributes['page']=''; // hopefully will get overwritten with a real one
 
@@ -301,7 +309,7 @@ function _url_to_pagelink($url,$abs_only=false,$perfect_only=true)
 			$match_string_pattern=preg_replace('#[A-Z]+#','[^\&\?]+',preg_quote($match_string));
 
 			$zones=find_all_zones();
-			if (preg_match('#^'.$match_string_pattern.'(/index\.php|$)#',$parsed_url['path'])!=0)
+			if (preg_match('#^'.$match_string_pattern.'$#',$parsed_url['path'])!=0)
 			{
 				$attributes=array_merge($attributes,$params);
 
@@ -348,6 +356,7 @@ function _url_to_pagelink($url,$abs_only=false,$perfect_only=true)
 	if (array_key_exists('id',$attributes)) $page_link.=':'.urldecode($attributes['id']);
 	foreach ($attributes as $key=>$val)
 	{
+		if (!is_string($val)) $val=strval($val);
 		if (($key!='page') && ($key!='type') && ($key!='id'))
 			$page_link.=':'.$key.'='.urldecode($val);
 	}

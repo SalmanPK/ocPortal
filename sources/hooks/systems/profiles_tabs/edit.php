@@ -32,8 +32,6 @@ class Hook_Profiles_Tabs_edit
 	{
 		if (is_guest($member_id_viewing)) return false;
 
-		if (!(($member_id_of==$member_id_viewing) || (has_specific_permission($member_id_viewing,'assume_any_member')) || (has_specific_permission($member_id_viewing,'member_maintenance')))) return false;
-
 		$hooks=find_all_hooks('systems','profiles_tabs_edit');
 		foreach (array_keys($hooks) as $hook)
 		{
@@ -67,6 +65,8 @@ class Hook_Profiles_Tabs_edit
 		if (function_exists('set_time_limit')) @set_time_limit(60); // Raise time limit, as can be slow
 
 		$tabs=array();
+
+		if (count($_POST)>0) echo ' '; // HACKHACK: IIS seems to have a weird issue with 'slowish spiky process not continuing with output' - this works around it. Not ideal as would break headers in any hook.
 
 		$hooks=find_all_hooks('systems','profiles_tabs_edit');
 		if (isset($hooks['settings'])) // Editing must go first, so changes reflect in the renders of the tabs

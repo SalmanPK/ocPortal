@@ -20,11 +20,11 @@ function realtime_rain_button_load_handler()
 			window.bubble_timer_2=null;
 		}
 		if (e.parentNode) e.parentNode.parentNode.removeChild(e.parentNode);
-		img.src='{$IMG;,footer/realtime_rain}'.replace(/^http:/,window.location.protocol);
+		img.src='{$IMG;,footer/realtime_rain}'.replace(/^https?:/,window.location.protocol);
 		return false;
 	}
 
-	img.src='{$IMG;,footer/realtime_rain_off}'.replace(/^http:/,window.location.protocol);
+	img.src='{$IMG;,footer/realtime_rain_off}'.replace(/^https?:/,window.location.protocol);
 	var tmp_element=document.getElementById('realtime_rain_img_loader');
 	if (tmp_element) tmp_element.parentNode.removeChild(tmp_element);
 	img.className='';
@@ -38,7 +38,7 @@ function realtime_rain_button_load_handler()
 	e.style.left=0;
 	e.style.top=0;
 	e.style.width='100%';
-	e.style.height=(get_window_height()-40)+'px';
+	e.style.height=(get_window_scroll_height()-80)+'px';
 	smooth_scroll(0);
 
 	start_realtime_rain();

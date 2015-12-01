@@ -197,7 +197,7 @@ q:after {
 }
 
 /* Re-apply default styles non-HTML5-aware browsers */
-aside, header, footer, nav, hgroup, article, section, figure {
+aside, header, footer, nav, article, section, figure {
 	display: block;
 }
 
@@ -207,13 +207,20 @@ textarea, input, code {
 
 /* Our little 'typing' effect */
 input[type="text"]:focus, input[type="password"]:focus {
-	background: url('{$IMG;,keyboard}') right center no-repeat white;
+	background: url('{$IMG;,keyboard}') right center no-repeat {$GET,native_ui_background};
+}
+
+input[type="text"][size="6"]:focus {
+	background-image: none;
 }
 
 /* Normally a browser default, but gets inherited on some phones */
 input[type="text"], input[type="password"], input[type="color"], input[type="email"], input[type="number"], input[type="range"], input[type="search"], input[type="tel"], input[type="url"], textarea, select {
 	background-color: {$GET,native_ui_background};
 	color: {$GET,native_ui_foreground};
+}
+input[type="text"]:disabled, input[type="password"]:disabled, input[type="color"]:disabled, input[type="email"]:disabled, input[type="number"]:disabled, input[type="range"]:disabled, input[type="search"]:disabled, input[type="tel"]:disabled, input[type="url"]:disabled, textarea:disabled, select:disabled {
+	color: gray;
 }
 
 a, .button_hyperlink {
@@ -288,6 +295,9 @@ td, th.de_th {
 	text-align: {!en_left};
 	font-weight: normal;
 	border: 0;
+}
+table[border="1"] td, table[border="1"] th.de_th { /* To make WYSIWYG easier */
+	border: 1px solid;
 }
 th.de_th {
 	background-color: transparent;
@@ -421,8 +431,11 @@ body#main_website {
 }
 
 body#main_website #main_website_inner {
-	min-height: 450px;
 	overflow: hidden;
+}
+
+body#main_website #main_website_inner .global_middle_outer {
+	min-height: 350px;
 }
 
 /* If not #main_website, it'll be one of these (the names correspond to the templates used) */
@@ -620,6 +633,9 @@ header h1 {
 	margin-top: -1.5em;
 	color: {$GET,area_key_text};
 }
+.box_inner>.title_tagline {
+	margin-top: 0;
+}
 
 body#main_website #main_website_inner, html>body div.global_middle_faux {
 	background-color: {$GET,main_background};
@@ -634,6 +650,13 @@ body#main_website #main_website_inner, html>body div.global_middle_faux {
 
 .global_middle_outer {
 	margin-top: 0.8em;
+	overflow: visible !important;
+}
+/* We normally hide stuff with overflow:hidden, but some share buttons use absolute positioned layers that need to escape our box */
+.global_middle_outer:after {
+	content: "";
+	display: table;
+	clear: both;
 }
 {+START,IF,{$NOT,{$CONFIG_OPTION,collapse_user_zones}}}
 	.zone_running_ .global_middle_outer {
@@ -1664,6 +1687,9 @@ table.scrollable_inside {
 	{+START,IF,{$NOT,{$MOBILE}}}
 		table-layout: fixed;
 	{+END}
+	{+START,IF,{$MOBILE}}
+		overflow-x: scroll;
+	{+END}
 }
 
 .spaced_table th, .spaced_table td {
@@ -1706,10 +1732,10 @@ table.scrollable_inside {
 .results_table[summary*="{!COLUMNED_TABLE}"]>tbody>tr:first-child>*:last-child {
 	{$BETA_CSS_PROPERTY,border-top-right-radius: 0px;}
 }
-.results_table>tbody>tr:last-child>*:first-child {
+.results_table>tbody>tr:last-child>*:first-child, .results_table>tbody>tr.last>*:first-child {
 	{$BETA_CSS_PROPERTY,border-bottom-left-radius: 5px;}
 }
-.results_table>tbody>tr:last-child>*:last-child {
+.results_table>tbody>tr:last-child>*:last-child, .results_table>tbody>tr.last>*:last-child {
 	{$BETA_CSS_PROPERTY,border-bottom-right-radius: 5px;}
 }
 
@@ -1729,15 +1755,15 @@ table.scrollable_inside {
 .results_table>*>tr>td:first-child, .results_table>*>tr>th:first-child {
 	border-left: 1px solid {$GET,standard_border};
 }
-.results_table>tbody>tr:last-child>td, .results_table>tbody>tr:last-child>th {
+.results_table>tbody>tr:last-child>td, .results_table>tbody>tr.last>td, .results_table>tbody>tr:last-child>th {
 	border-bottom: 1px solid {$GET,standard_border};
 }
 
-.results_table>*>.zebra_0>th, .results_table>*>.zebra_0>td, div.zebra_0 {
+table>*>.zebra_0>th, table>*>.zebra_0>td, div.zebra_0 {
 	background-color: {$GET,area_zebra_background} !important;
 	color: {$GET,slightly_seeded_text};
 }
-.results_table>*>.zebra_1>th, .results_table>*>.zebra_1>td, div.zebra_1 {
+table>*>.zebra_1>th, table>*>.zebra_1>td, div.zebra_1 {
 	background-color: {$GET,area_background} !important;
 	color: {$GET,slightly_seeded_text};
 }
@@ -3906,7 +3932,7 @@ figure {
 		padding-right: 10px !important;
 	}
 
-	body a.link_exempt, body link_exempt_wrap a, body a[href*=".php"] { /* Turn off the "new window" icon for URLs containing ".php" because usually in ocPortal these are used for system pages that don't warrant these icons */
+	body a.link_exempt, body link_exempt_wrap a, body a[href*=".php"], a[rel="lightbox"] { /* Turn off the "new window" icon for URLs containing ".php" because usually in ocPortal these are used for system pages that don't warrant these icons */
 		background-image: none;
 		padding: 0px;
 	}
@@ -3994,6 +4020,8 @@ a[title="{!VIRTUAL_ROOT}"]:hover {
 		background: none !important;
 	}
 
+	.non_accessibility_redundancy,
+	.menu_type__top,
 	.buttons_group,
 	.associated_links_block_group,
 	.screen_actions_outer,
@@ -4008,7 +4036,7 @@ a[title="{!VIRTUAL_ROOT}"]:hover {
 	.comments_form,
 	.community_message,
 	.ratings, .trackbacks {
-		display: none;
+		display: none !important;
 	}
 
 	.global_navigation {

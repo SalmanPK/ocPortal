@@ -28,7 +28,7 @@ function username_check_script()
 	header("Cache-Control: no-cache, must-revalidate"); // HTTP/1.1
 	header("Expires: Mon, 26 Jul 1997 05:00:00 GMT"); // Date in the past
 
-	header('Content-Type: text/plain');
+	header('Content-Type: text/plain; charset='.get_charset());
 
 	require_code('ocf_members_action');
 	require_code('ocf_members_action2');
@@ -48,7 +48,7 @@ function find_permissions_script()
 	header("Cache-Control: no-cache, must-revalidate"); // HTTP/1.1
 	header("Expires: Mon, 26 Jul 1997 05:00:00 GMT"); // Date in the past
 
-	header('Content-Type: text/plain');
+	header('Content-Type: text/plain; charset='.get_charset());
 
 	require_code('zones2');
 	require_code('permissions2');
@@ -108,12 +108,12 @@ function retrieve_autosave()
 	header("Cache-Control: no-cache, must-revalidate"); // HTTP/1.1
 	header("Expires: Mon, 26 Jul 1997 05:00:00 GMT"); // Date in the past
 
-	header('Content-Type: text/plain');
+	header('Content-Type: text/plain; charset='.get_charset());
 
 	$member_id=get_member();
 	$key=post_param('key');
 
-	@ini_set('ocproducts.xss_detect','0');
+	safe_ini_set('ocproducts.xss_detect','0');
 
 	echo $GLOBALS['SITE_DB']->query_value_null_ok('autosave','a_value',array('a_member_id'=>$member_id,'a_key'=>$key),'ORDER BY a_time DESC');
 }
@@ -130,13 +130,17 @@ function fractional_edit_script()
 
 	$_POST['fractional_edit']='1';
 
-	global $SESSION_CONFIRMED;
-	if ($SESSION_CONFIRMED==0)
+	$zone=get_param('zone');
+
+	if ($GLOBALS['SITE_DB']->query_value('zones','zone_require_session',array('zone_name'=>$zone))==1)
 	{
-		return;
+		global $SESSION_CONFIRMED;
+		if ($SESSION_CONFIRMED==0)
+		{
+			return;
+		}
 	}
 
-	$zone=get_param('zone');
 	$page=get_param('page');
 	if (!has_actual_page_access(get_member(),$page,$zone))
 		access_denied('ZONE_ACCESS');
@@ -152,7 +156,7 @@ function fractional_edit_script()
 		$_edited=comcode_to_tempcode($edited,get_member());
 		$edited=$_edited->evaluate();
 	}
-	@ini_set('ocproducts.xss_detect','0');
+	safe_ini_set('ocproducts.xss_detect','0');
 	echo $edited;
 }
 
@@ -230,10 +234,10 @@ function comcode_convert_script()
 		$fields->attach(form_input_huge(do_lang_tempcode('TEXT'),'','data','',true));
 		$fields->attach(form_input_tick('Convert HTML to Comcode','','from_html',false));
 		$fields->attach(form_input_tick('Convert to semihtml','','semihtml',false));
-		$fields->attach(form_input_tick('Comes from WYSIWYG','','data__is_wysiwyg',false));
 		$fields->attach(form_input_tick('Lax mode (less parse rules)','','lax',false));
 		$hidden=new ocp_tempcode();
 		$hidden->attach(form_input_hidden('to_comcode_xml',strval(either_param_integer('to_comcode_xml',0))));
+		$hidden->attach(form_input_hidden('keep_skip_rubbish',strval(either_param_integer('keep_skip_rubbish',0))));
 		$out2=globalise(do_template('FORM_SCREEN',array('_GUID'=>'dd82970fa1196132e07049871c51aab7','TITLE'=>$title,'SUBMIT_NAME'=>do_lang_tempcode('VIEW'),'TEXT'=>'','HIDDEN'=>$hidden,'URL'=>find_script('comcode_convert',true),'FIELDS'=>$fields)),NULL,'',true);
 		$out2->evaluate_echo();
 		return;
@@ -287,11 +291,11 @@ function comcode_convert_script()
 
 		if (preg_replace('#<!--.*-->#Us','',preg_replace('#\s+#','',$new))!=preg_replace('#<!--.*-->#Us','',preg_replace('#\s+#','',$out)))
 		{
-			/*$myfile=fopen(get_file_base().'/a','wb');
+			/*$myfile=fopen(get_file_base().'/b','wb');
 			fwrite($myfile,preg_replace('#<!--.*-->#Us','',preg_replace('#\s+#',chr(10),$new)));
 			fclose($myfile);
 
-			$myfile=fopen(get_file_base().'/b','wb');
+			$myfile=fopen(get_file_base().'/a','wb');
 			fwrite($myfile,preg_replace('#<!--.*-->#Us','',preg_replace('#\s+#',chr(10),$out)));
 			fclose($myfile);*/
 
@@ -300,20 +304,20 @@ function comcode_convert_script()
 	}
 	if (either_param_integer('keep_skip_rubbish',0)==0)
 	{
-		@ini_set('ocproducts.xss_detect','0');
+		safe_ini_set('ocproducts.xss_detect','0');
 
 		$box_title=get_param('box_title','');
 		if (is_object($out)) $out=$out->evaluate();
 		if (($box_title!='') && ($out!='')) $out=static_evaluate_tempcode(put_in_standard_box(make_string_tempcode($out),$box_title));
 
-		header('Content-Type: text/xml');
+		header('Content-Type: text/xml; charset='.get_charset());
 		echo '<?xml version="1.0" encoding="'.get_charset().'"?'.'>';
 		echo '<request><result>';
 		echo xmlentities($out);
 		echo '</result></request>';
 	} else
 	{
-		@ini_set('ocproducts.xss_detect','0');
+		safe_ini_set('ocproducts.xss_detect','0');
 
 		header('Content-type: text/plain; charset='.get_charset());
 		echo $out;
@@ -431,9 +435,9 @@ function namelike_script()
 		$names=array_unique($names);
 	}
 
-	@ini_set('ocproducts.xss_detect','0');
+	safe_ini_set('ocproducts.xss_detect','0');
 
-	header('Content-Type: text/xml');
+	header('Content-Type: text/xml; charset='.get_charset());
 	echo '<?xml version="1.0" encoding="'.get_charset().'"?'.'>';
 	echo '<request><result>';
 	foreach ($names as $name)
@@ -452,21 +456,21 @@ function ajax_tree_script()
 	$site_closed=get_option('site_closed');
 	if (($site_closed=='1') && (!has_specific_permission(get_member(),'access_closed_site')) && (!$GLOBALS['IS_ACTUALLY_ADMIN']))
 	{
-		header('Content-Type: text/plain');
+		header('Content-Type: text/plain; charset='.get_charset());
 		@exit(get_option('closed'));
 	}
 
 	header("Cache-Control: no-cache, must-revalidate"); // HTTP/1.1
 	header("Expires: Mon, 26 Jul 1997 05:00:00 GMT"); // Date in the past
 
-	header('Content-Type: text/xml');
+	header('Content-Type: text/xml; charset='.get_charset());
 	$hook=filter_naughty_harsh(get_param('hook'));
 	require_code('hooks/systems/ajax_tree/'.$hook);
 	$object=object_factory('Hook_'.$hook);
 	convert_data_encodings(true);
 	$id=get_param('id','',true);
 	if ($id=='') $id=NULL;
-	@ini_set('ocproducts.xss_detect','0');
+	safe_ini_set('ocproducts.xss_detect','0');
 	$html_mask=get_param_integer('html_mask',0)==1;
 	if (!$html_mask) echo '<?xml version="1.0" encoding="'.get_charset().'"?'.'>';
 	echo ($html_mask?'<html>':'<request>');
@@ -488,7 +492,7 @@ function confirm_session_script()
 	header("Cache-Control: no-cache, must-revalidate"); // HTTP/1.1
 	header("Expires: Mon, 26 Jul 1997 05:00:00 GMT"); // Date in the past
 
-	header('Content-Type: text/plain');
+	header('Content-Type: text/plain; charset='.get_charset());
 	global $SESSION_CONFIRMED;
 	if ($SESSION_CONFIRMED==0) echo $GLOBALS['FORUM_DRIVER']->get_username(get_member());
 	echo '';
@@ -504,7 +508,7 @@ function load_template_script()
 
 	if (!has_actual_page_access(get_member(),'admin_themes','adminzone')) exit();
 
-	@ini_set('ocproducts.xss_detect','0');
+	safe_ini_set('ocproducts.xss_detect','0');
 
 	$theme=filter_naughty(get_param('theme'));
 	$id=filter_naughty(get_param('id'));
@@ -524,7 +528,7 @@ function sheet_script()
 	header("Cache-Control: no-cache, must-revalidate"); // HTTP/1.1
 	header("Expires: Mon, 26 Jul 1997 05:00:00 GMT"); // Date in the past
 
-	header('Content-Type: text/css');
+	header('Content-Type: text/css; charset='.get_charset());
 	$sheet=get_param('sheet');
 	if ($sheet!='') echo str_replace('../../../','',file_get_contents(css_enforce(filter_naughty_harsh($sheet))));
 }
@@ -538,6 +542,7 @@ function snippet_script()
 	header("Expires: Mon, 26 Jul 1997 05:00:00 GMT"); // Date in the past
 
 	header('Content-Type: text/plain; charset='.get_charset());
+	convert_data_encodings(true);
 	$hook=filter_naughty_harsh(get_param('snippet'));
 	require_code('hooks/systems/snippets/'.$hook,true);
 	$object=object_factory('Hook_'.$hook);
@@ -556,7 +561,7 @@ function snippet_script()
 
 	// End early execution listening (this means register_shutdown_function will run after connection closed - faster)
 	if (function_exists('apache_setenv')) @apache_setenv('no-gzip','1');
-	@ini_set('zlib.output_compression','Off');
+	safe_ini_set('zlib.output_compression','Off');
 	$size=strlen($out);
 	header('Connection: close');
 	@ignore_user_abort(true);

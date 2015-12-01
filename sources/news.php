@@ -47,7 +47,7 @@ function render_news_box($row,$zone='_SEARCH')
 	if ($row['news_image']!='')
 	{
 		$img=$row['news_image'];
-		if (url_is_local($img)) $img=get_base_url().'/'.$img;
+		if (url_is_local($img)) $img=get_custom_base_url().'/'.$img;
 	}
 	$category=get_translated_text($news_cat_row['nc_title']);
 
@@ -263,6 +263,7 @@ function add_news($title,$news,$author=NULL,$validated=1,$allow_rating=1,$allow_
 
 	if (!is_null($news_categories))
 	{
+		$news_categories=array_unique($news_categories);
 		foreach ($news_categories as $i=>$value)
 		{
 			if ((is_null($value)) && (!$already_created_personal_category))
@@ -570,8 +571,8 @@ function delete_news($id)
 	$GLOBALS['SITE_DB']->query_delete('news',array('id'=>$id),'',1);
 	$GLOBALS['SITE_DB']->query_delete('news_category_entries',array('news_entry'=>$id));
 
-	$GLOBALS['SITE_DB']->query_delete('rating',array('rating_for_type'=>'news','rating_for_id'=>$id));
-	$GLOBALS['SITE_DB']->query_delete('trackbacks',array('trackback_for_type'=>'news','trackback_for_id'=>$id));
+	$GLOBALS['SITE_DB']->query_delete('rating',array('rating_for_type'=>'news','rating_for_id'=>strval($id)));
+	$GLOBALS['SITE_DB']->query_delete('trackbacks',array('trackback_for_type'=>'news','trackback_for_id'=>strval($id)));
 	require_code('notifications');
 	delete_all_notifications_on('comment_posted','news_'.strval($id));
 
@@ -643,12 +644,25 @@ function nice_get_news_categories($it=NULL,$show_all_personal_categories=false,$
 	$categories=new ocp_tempcode();
 	$add_cat=true;
 
+	$may_blog=has_specific_permission(get_member(),'have_personal_category','cms_news');
+
 	foreach ($_cats as $cat)
 	{
 		if ($cat['nc_owner']==get_member()) $add_cat=false;
 
 		if (!has_category_access(get_member(),'news',strval($cat['id']))) continue;
-		if (($addable_filter) && (!has_submit_permission('high',get_member(),get_ip_address(),'cms_news',array('news',$cat['id'])))) continue;
+		if ($addable_filter)
+		{
+			if ($cat['nc_owner']!==get_member())
+			{
+				if (!has_submit_permission('high',get_member(),get_ip_address(),'cms_news',array('news',$cat['id'])))
+					continue;
+			} else
+			{
+				if (!$may_blog)
+					continue;
+			}
+		}
 
 		if (is_null($cat['nc_owner']))
 		{
@@ -661,7 +675,7 @@ function nice_get_news_categories($it=NULL,$show_all_personal_categories=false,$
 		}
 	}
 
-	if ((!$only_existing) && (has_specific_permission(get_member(),'have_personal_category','cms_news')) && ($add_cat) && (!is_guest()))
+	if ((!$only_existing) && ($may_blog) && ($add_cat) && (!is_guest()))
 	{
 		$categories->attach(form_input_list_entry('personal',(!$prefer_not_blog_selected) && in_array(NULL,$it),do_lang_tempcode('MEMBER_CATEGORY',do_lang_tempcode('_NEW',escape_html($GLOBALS['FORUM_DRIVER']->get_username(get_member()))))));
 	}

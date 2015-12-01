@@ -37,8 +37,8 @@ $RELATIVE_PATH='';
 
 error_reporting(E_ALL);
 
-@ini_set('display_errors','1');
-@ini_set('assert.active','0');
+safe_ini_set('display_errors','1');
+safe_ini_set('assert.active','0');
 
 global $MOBILE;
 $MOBILE=0;
@@ -84,11 +84,11 @@ if (!array_key_exists('type',$_GET))
 $shl=@ini_get('suhosin.memory_limit');
 if (($shl===false) || ($shl=='') || ($shl=='0'))
 {
-	@ini_set('memory_limit','-1');
+	safe_ini_set('memory_limit','-1');
 } else
 {
 	if (is_numeric($shl)) $shl.='M'; // Units are in MB for this, while PHP's memory limit setting has it in bytes
-	@ini_set('memory_limit',$shl);
+	safe_ini_set('memory_limit',$shl);
 }
 
 // Tunnel into some ocPortal code we can use
@@ -359,7 +359,13 @@ function step_1()
 	if ((!function_exists('zip_open')) && (!@file_exists('/usr/bin/unzip')))
 		$warnings->attach(do_template('INSTALLER_WARNING',array('MESSAGE'=>do_lang_tempcode('NO_ZIP_ON_SERVER'))));
 	if (!function_exists('imagecreatefromstring'))
+	{
 		$warnings->attach(do_template('INSTALLER_WARNING',array('MESSAGE'=>do_lang_tempcode('NO_GD_ON_SERVER'))));
+	} else
+	{
+		if (!function_exists('imagepng'))
+			$warnings->attach(do_template('INSTALLER_WARNING',array('MESSAGE'=>do_lang_tempcode('NO_GD_ON_SERVER_PNG'))));
+	}
 	if (!function_exists('xml_parser_create'))
 		$warnings->attach(do_template('INSTALLER_WARNING',array('MESSAGE'=>do_lang_tempcode('NO_XML_ON_SERVER'))));
 	if ((function_exists('memory_get_usage')) && (@ini_get('memory_limit')!='') && (@ini_get('memory_limit')!='-1') && (@ini_get('memory_limit')!='0') && (intval(trim(str_replace('M','',@ini_get('memory_limit'))))<16))
@@ -440,7 +446,7 @@ END;
 		if (@preg_match('#(\s|,|^)'.str_replace('#','\#',preg_quote($function)).'(\s|$|,)#',strtolower(@ini_get('disable_functions').','.ini_get('suhosin.executor.func.blacklist').','.ini_get('suhosin.executor.include.blacklist').','.ini_get('suhosin.executor.eval.blacklist')))!=0)
 			$warnings->attach(do_template('INSTALLER_WARNING',array('MESSAGE'=>do_lang_tempcode('DISABLED_FUNCTION',escape_html($function)))));
 	}
-	if (function_exists('mysqli_get_client_version'))
+	/*client check is wrong if (function_exists('mysqli_get_client_version'))
 	{
 		$x=float_to_raw_string(floatval(mysqli_get_client_version())/10000.0);
 		if (version_compare($x,'4.1.0','<'))
@@ -450,7 +456,7 @@ END;
 	{
 		if (version_compare(mysql_get_client_info(),'4.1.0','<'))
 			$warnings->attach(do_template('INSTALLER_WARNING',array('MESSAGE'=>do_lang_tempcode('MYSQL_TOO_OLD'))));
-	}
+	}*/
 
 	global $FILE_ARRAY;
 
@@ -1009,9 +1015,26 @@ function step_5()
 		}
 	}
 
+    // Check table prefix
 	$table_prefix=post_param('table_prefix');
 	if ($table_prefix=='') warn_exit(do_lang_tempcode('NO_BLANK_TABLE_PREFIX'));
 
+    // Test base URL isn't subject to redirects
+    $test_url=$base_url.'/installer_is_testing_base_urls.php';
+    require_code('files');
+    http_download_file($test_url,NULL,false);
+    global $HTTP_DOWNLOAD_URL;
+    if ($HTTP_DOWNLOAD_URL!=$test_url)
+    {
+        if (preg_replace('#www\.#','',$HTTP_DOWNLOAD_URL)==$test_url)
+        {
+            warn_exit(do_lang_tempcode('BASE_URL_REDIRECTS_WITH_WWW'));
+        }
+        elseif ($HTTP_DOWNLOAD_URL==preg_replace('#www\.#','',$test_url))
+        {
+            warn_exit(do_lang_tempcode('BASE_URL_REDIRECTS_WITHOUT_WWW'));
+        }
+    }
 
 	// Give warning if database contains data
 	global $SITE_INFO;
@@ -1797,7 +1820,7 @@ function step_6()
 	require_once(get_file_base().'/'.$info_file);
 	require_code('database');
 	require_code('database_action');
-   require_code('menus2');
+	require_code('menus2');
 	require_code('config');
 	include_ocf();
 
@@ -2114,6 +2137,23 @@ function require_code($codename)
 function object_factory($class)
 {
 	return new $class;
+}
+
+/**
+ * Sets the value of a configuration option, if the PHP environment allows it.
+ *
+ * @param  string		Config option.
+ * @param  string		New value of option.
+ * @return ~string	Old value of option (false: error).
+ */
+function safe_ini_set($var,$value)
+{
+	if (@preg_match('#(\s|,|^)'.str_replace('#','\#',preg_quote('ini_set')).'(\s|$|,)#',strtolower(@ini_get('disable_functions').','.ini_get('suhosin.executor.func.blacklist').','.ini_get('suhosin.executor.include.blacklist').','.ini_get('suhosin.executor.eval.blacklist')))!=0)
+	{
+		return false;
+	}
+
+	return @ini_set($var,$value);
 }
 
 /**
@@ -2566,6 +2606,12 @@ php_value suhosin.post.max_totalname_length "10000"
 php_value suhosin.request.max_totalname_length "10000"
 php_flag suhosin.cookie.encrypt off
 php_flag suhosin.sql.union off
+php_flag suhosin.sql.comment off
+php_flag suhosin.sql.multiselect off
+php_flag suhosin.upload.remove_binary off
+# Some free hosts prepend/append junk, which is not legitimate (breaks binary and AJAX scripts, potentially more)
+php_value auto_prepend_file none
+php_value auto_append_file none
 END;
 
 if ($php_value_ok) $clauses[]=<<<END
@@ -2585,7 +2631,7 @@ php_value open_basedir "{$file_base}"
 END;
 */
 $clauses[]=<<<END
-Options +FollowSymLinks
+Options +FollowSymLinks -MultiViews
 END;
 
 $clauses[]=<<<END
@@ -2632,18 +2678,18 @@ RewriteRule ^([^=]*)pg/([^/\&\?\.]*)&(.*)$ $1index.php\?$3&page=$2 [L,QSA]
 
 # These have a specially reduced form (no need to make it too explicit that these are Wiki+)
 #  We shouldn't shorten them too much, or the actual zone or base url might conflict
-RewriteRule ^(site|forum|adminzone|cms|personalzone|collaboration)/s/([^\&\?]*)\.htm$ $1/index.php\?page=cedi&id=$2 [L,QSA]
+RewriteRule ^(site|forum|adminzone|cms|collaboration)/s/([^\&\?]*)\.htm$ $1/index.php\?page=cedi&id=$2 [L,QSA]
 RewriteRule ^s/([^\&\?]*)\.htm$ index\.php\?page=cedi&id=$1 [L,QSA]
 
 # These have a specially reduce form (wide is implied)
-RewriteRule ^(site|forum|adminzone|cms|personalzone|collaboration)/galleries/image/([^\&\?]*)\.htm$ $1/index.php\?page=galleries&type=image&id=$2&wide=1 [L,QSA]
-RewriteRule ^(site|forum|adminzone|cms|personalzone|collaboration)/galleries/video/([^\&\?]*)\.htm$ $1/index.php\?page=galleries&type=video&id=$2&wide=1 [L,QSA]
-RewriteRule ^(site|forum|adminzone|cms|personalzone|collaboration)/iotds/view/([^\&\?]*)\.htm$ $1/index.php\?page=iotds&type=view&id=$2&wide=1 [L,QSA]
+RewriteRule ^(site|forum|adminzone|cms|collaboration)/galleries/image/([^\&\?]*)\.htm$ $1/index.php\?page=galleries&type=image&id=$2&wide=1 [L,QSA]
+RewriteRule ^(site|forum|adminzone|cms|collaboration)/galleries/video/([^\&\?]*)\.htm$ $1/index.php\?page=galleries&type=video&id=$2&wide=1 [L,QSA]
+RewriteRule ^(site|forum|adminzone|cms|collaboration)/iotds/view/([^\&\?]*)\.htm$ $1/index.php\?page=iotds&type=view&id=$2&wide=1 [L,QSA]
 
 # These are standard patterns
-RewriteRule ^(site|forum|adminzone|cms|personalzone|collaboration)/([^/\&\?]+)/([^/\&\?]*)/([^\&\?]*)\.htm$ $1/index.php\?page=$2&type=$3&id=$4 [L,QSA]
-RewriteRule ^(site|forum|adminzone|cms|personalzone|collaboration)/([^/\&\?]+)/([^/\&\?]*)\.htm$ $1/index.php\?page=$2&type=$3 [L,QSA]
-RewriteRule ^(site|forum|adminzone|cms|personalzone|collaboration)/([^/\&\?]+)\.htm$ $1/index.php\?page=$2 [L,QSA]
+RewriteRule ^(site|forum|adminzone|cms|collaboration)/([^/\&\?]+)/([^/\&\?]*)/([^\&\?]*)\.htm$ $1/index.php\?page=$2&type=$3&id=$4 [L,QSA]
+RewriteRule ^(site|forum|adminzone|cms|collaboration)/([^/\&\?]+)/([^/\&\?]*)\.htm$ $1/index.php\?page=$2&type=$3 [L,QSA]
+RewriteRule ^(site|forum|adminzone|cms|collaboration)/([^/\&\?]+)\.htm$ $1/index.php\?page=$2 [L,QSA]
 RewriteRule ^([^/\&\?]+)/([^/\&\?]*)/([^\&\?]*)\.htm$ index.php\?page=$1&type=$2&id=$3 [L,QSA]
 RewriteRule ^([^/\&\?]+)/([^/\&\?]*)\.htm$ index.php\?page=$1&type=$2 [L,QSA]
 RewriteRule ^([^/\&\?]+)\.htm$ index.php\?page=$1 [L,QSA]

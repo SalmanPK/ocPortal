@@ -215,16 +215,16 @@ class Module_admin_orders
 
 			$submitted_by=$GLOBALS['FORUM_DRIVER']->get_username($row['c_member']);
 			$member_url=build_url(array('page'=>'members','type'=>'view','id'=>$row['c_member']),get_module_zone('members'));
-			$member=hyperlink($member_url,$submitted_by,false,false,do_lang('CUSTOMER'));
+			$member=hyperlink($member_url,$submitted_by,false,true,do_lang('CUSTOMER'));
 
 			$view_url=build_url(array('page'=>'_SELF','type'=>'order_det','id'=>$row['id']),'_SELF');
 
-			$order_date=hyperlink($view_url,get_timezoned_date($row['add_date'],true,false,true,true));
+			$order_date=hyperlink($view_url,get_timezoned_date($row['add_date'],true,false,true,true),false,true);
 
 			if (($row['transaction_id']!='') && ($row['order_status']!='ORDER_STATUS_awaiting_payment'))
 			{	
 				$transaction_details_url=build_url(array('page'=>'admin_ecommerce','type'=>'logs','product'=>$order_title,'id'=>$row['id']),get_module_zone('admin_ecommerce'));
-				$transaction_id=hyperlink($transaction_details_url,$row['transaction_id']);
+				$transaction_id=hyperlink($transaction_details_url,$row['transaction_id'],false,true);
 			} else
 			{
 				$transaction_id=do_lang_tempcode('INCOMPLETED_TRANCACTION');
@@ -311,7 +311,7 @@ class Module_admin_orders
 
 			$product_name=$row['p_name'];
 
-			$product=hyperlink($product_info_url,$product_name,false,false,do_lang('VIEW'));
+			$product=hyperlink($product_info_url,$product_name,false,true,do_lang('VIEW'));
 
 			$product_entries->attach(results_entry(
 				array(
@@ -391,7 +391,7 @@ class Module_admin_orders
 
 		$fields->attach(form_input_hidden('order_id',strval($id)));
 
-		$title=get_screen_title('ADD_NOTE_TITLE',true,array(strval($id)));
+		$title=get_screen_title('ADD_NOTE_TITLE',true,array(escape_html(strval($id))));
 
 		if ($last_action=='dispatched')
 		{	
@@ -419,7 +419,7 @@ class Module_admin_orders
 	{
 		$id=post_param_integer('order_id');
 
-		$title=get_screen_title('ADD_NOTE_TITLE',true,array(strval($id)));
+		$title=get_screen_title('ADD_NOTE_TITLE',true,array(escape_html(strval($id))));
 
 		$notes=post_param('note');
 

@@ -18,6 +18,8 @@
  * @package		core
  */
 
+/*EXTRA FUNCTIONS: iconv*/
+
 /**
  * Standard code module initialisation function.
  */
@@ -57,12 +59,12 @@ function init__global2()
 	@header('Cache-Control: no-cache, max-age=0');
 	@header('Pragma: no-cache'); // for proxies, and also IE
 
-	if ((strpos($_SERVER['PHP_SELF'],'upgrader.php')===false) && ((!isset($SITE_INFO['no_extra_closed_file'])) || ($SITE_INFO['no_extra_closed_file']=='0')))
+	if ((is_file('closed.html')) && (get_param_integer('keep_force_open',0)==0))
 	{
-		if ((is_file('closed.html')) || (@is_file('../closed.html')))
+		if ((strpos($_SERVER['PHP_SELF'],'upgrader.php')===false) && (strpos($_SERVER['PHP_SELF'],'execute_temp.php')===false) && ((!isset($SITE_INFO['no_extra_closed_file'])) || ($SITE_INFO['no_extra_closed_file']=='0')))
 		{
 			if ((@strpos($_SERVER['SERVER_SOFTWARE'],'IIS')===false)) header('HTTP/1.0 503 Service Temporarily Unavailable');
-			header('Location: '.get_base_url().'closed.html');
+			header('Location: '.(is_file($RELATIVE_PATH.'closed.html')?'closed.html':'../closed.html'));
 			exit();
 		}
 	}
@@ -201,12 +203,12 @@ function init__global2()
 	$WHAT_IS_RUNNING=current_script();
 
 	error_reporting(E_ALL);
-	@ini_set('html_errors','1');
-	@ini_set('docref_root','http://www.php.net/manual/en/');
-	@ini_set('docref_ext','.php');
+	safe_ini_set('html_errors','1');
+	safe_ini_set('docref_root','http://www.php.net/manual/en/');
+	safe_ini_set('docref_ext','.php');
 
 	$SERVER_TIMEZONE=function_exists('date_default_timezone_get')?@date_default_timezone_get():ini_get('date.timezone');
-	@ini_set('date.timezone','UTC');
+	safe_ini_set('date.timezone','UTC');
 	if (function_exists('date_default_timezone_set')) date_default_timezone_set('UTC'); else putenv('TZ=UTC');
 
 	$HAS_SET_ERROR_HANDLER=false;
@@ -221,8 +223,8 @@ function init__global2()
 	if ($GLOBALS['DEV_MODE'])
 	{
 		if (function_exists('set_time_limit')) @set_time_limit(10);
-		@ini_set('ocproducts.type_strictness','1');
-		@ini_set('ocproducts.xss_detect','1');
+		safe_ini_set('ocproducts.type_strictness','1');
+		safe_ini_set('ocproducts.xss_detect','1');
 	}
 	if ($GLOBALS['DEV_MODE'])
 	{
@@ -236,16 +238,16 @@ function init__global2()
 	// Try and make the PHP environment as we need it
 	if (function_exists('set_magic_quotes_runtime')) @set_magic_quotes_runtime(0); // @'d because it's deprecated and PHP 5.3 may give an error
 
-	@ini_set('auto_detect_line_endings','0');
-	@ini_set('include_path','');
-	@ini_set('default_socket_timeout','60');
+	safe_ini_set('auto_detect_line_endings','0');
+	safe_ini_set('include_path','');
+	safe_ini_set('default_socket_timeout','60');
 
-	@ini_set('allow_url_fopen','0');
-	@ini_set('suhosin.executor.disable_emodifier','1'); // Extra security if suhosin is available
-	@ini_set('suhosin.executor.multiheader','1'); // Extra security if suhosin is available
-	@ini_set('suhosin.executor.disable_eval','0');
-	@ini_set('suhosin.executor.eval.whitelist','');
-	@ini_set('suhosin.executor.func.whitelist','');
+	safe_ini_set('allow_url_fopen','0');
+	safe_ini_set('suhosin.executor.disable_emodifier','1'); // Extra security if suhosin is available
+	safe_ini_set('suhosin.executor.multiheader','1'); // Extra security if suhosin is available
+	safe_ini_set('suhosin.executor.disable_eval','0');
+	safe_ini_set('suhosin.executor.eval.whitelist','');
+	safe_ini_set('suhosin.executor.func.whitelist','');
 
 	// Load most basic config
 	$IN_MINIKERNEL_VERSION=0;
@@ -295,8 +297,6 @@ function init__global2()
 			exit();
 		}
 	}
-	srand(make_seed());
-	mt_srand(make_seed());
 	if (($MICRO_BOOTUP==0) && ($MICRO_AJAX_BOOTUP==0)) // Fast cacheing for bots
 	{
 		if ((running_script('index')) && (count($_POST)==0))
@@ -418,17 +418,17 @@ function init__global2()
 	// Our logging (change false to true for temporarily changing it so staff get logging)
 	if (get_option('log_php_errors')=='1')
 	{
-		@ini_set('log_errors','1');
+		safe_ini_set('log_errors','1');
 		if (addon_installed('errorlog'))
-			@ini_set('error_log',get_custom_file_base().'/data_custom/errorlog.php');
+			safe_ini_set('error_log',get_custom_file_base().'/data_custom/errorlog.php');
 	}
 	if (($MICRO_BOOTUP==0) && ($MICRO_AJAX_BOOTUP==0) && ((get_option('display_php_errors')=='1') || (running_script('upgrader')) || (has_specific_permission(get_member(),'see_php_errors'))))
 	{
-		@ini_set('display_errors','1');
-	} elseif (!$GLOBALS['DEV_MODE']) @ini_set('display_errors','0');
+		safe_ini_set('display_errors','1');
+	} elseif (!$GLOBALS['DEV_MODE']) safe_ini_set('display_errors','0');
 
 	// G-zip?
-	@ini_set('zlib.output_compression',(get_option('gzip_output')=='1')?'On':'Off');
+	safe_ini_set('zlib.output_compression',(get_option('gzip_output')=='1')?'On':'Off');
 
 	if ((function_exists('setlocale')) && ($MICRO_AJAX_BOOTUP==0))
 	{
@@ -476,7 +476,7 @@ function init__global2()
 	$func=get_defined_functions();
 	print_r($func['user']);*/
 
-	if (((ocp_srv('HTTPS')!='') && (ocp_srv('HTTPS')!='off')) && (((!defined('HIPHOP_PHP')) || (tacit_https()) || (is_page_https(get_zone_name(),get_page_name()))))) // Fix IE bug
+	if ((tacit_https()) || (is_page_https(get_zone_name(),get_page_name()))) // Fix IE bug
 	{
 		@header('Cache-Control: private');
 		@header('Pragma: private');
@@ -554,7 +554,7 @@ function init__global2()
 		if (substr($default_memory_limit,-2)=='MB') $default_memory_limit=substr($default_memory_limit,0,strlen($default_memory_limit)-1);
 		if ((is_numeric($default_memory_limit)) && (intval($default_memory_limit)<1024*1024*16)) $default_memory_limit.='M';
 	}
-	@ini_set('memory_limit',$default_memory_limit);
+	safe_ini_set('memory_limit',$default_memory_limit);
 	memory_limit_for_max_param('max');
 	if ((isset($GLOBALS['FORUM_DRIVER'])) && ($GLOBALS['FORUM_DRIVER']->is_super_admin(get_member())))
 	{
@@ -566,7 +566,7 @@ function init__global2()
 			$memory_test=get_param_integer('keep_memory_limit_test',0);
 			if (($memory_test!=0) && ($memory_test<=32))
 			{
-				@ini_set('memory_limit',strval($memory_test).'M');
+				safe_ini_set('memory_limit',strval($memory_test).'M');
 			}
 		}
 	}
@@ -668,9 +668,9 @@ function fast_spider_cache($bot=true)
 				}
 			}
 
-			if (function_exists('gzencode'))
+			if ((function_exists('gzencode')) && (php_function_allowed('ini_set')))
 			{
-				ini_set('zlib.output_compression','Off');
+				safe_ini_set('zlib.output_compression','Off');
 				header('Content-Encoding: gzip');
 			}
 
@@ -700,7 +700,7 @@ function memory_limit_for_max_param($max_param)
 			$shl=@ini_get('suhosin.memory_limit');
 			if (($shl===false) || ($shl=='') || ($shl=='0'))
 			{
-				@ini_set('memory_limit','128M');
+				safe_ini_set('memory_limit','128M');
 			}
 		}
 	}
@@ -714,12 +714,12 @@ function disable_php_memory_limit()
 	$shl=@ini_get('suhosin.memory_limit');
 	if (($shl===false) || ($shl=='') || ($shl=='0'))
 	{
-		@ini_set('memory_limit','64M');
-		@ini_set('memory_limit','-1');
+		safe_ini_set('memory_limit','64M');
+		safe_ini_set('memory_limit','-1');
 	} else
 	{
 		if (is_numeric($shl)) $shl.='M'; // Units are in MB for this, while PHP's memory limit setting has it in bytes
-		@ini_set('memory_limit',$shl);
+		safe_ini_set('memory_limit',$shl);
 	}
 }
 
@@ -741,13 +741,13 @@ function get_charset()
 		return $CHARSET;
 	}
 
-	global $LANG_LOADED_LANG;
-	if ((function_exists('do_lang')) && (function_exists('user_lang')) && (isset($LANG_LOADED_LANG[user_lang()]['critical_error'])) && (!in_safe_mode()))
+	global $LANGS_REQUESTED;
+	if ((function_exists('do_lang')) && (function_exists('user_lang')) && (isset($LANGS_REQUESTED['critical_error'])) && (isset($LANGS_REQUESTED['global'])) && (!in_safe_mode()))
 	{
 		$attempt=do_lang('charset',NULL,NULL,NULL,NULL,false);
 		if ($attempt!==NULL)
 		{
-			$CHARSET=$attempt;
+			$CHARSET=trim($attempt);
 			return $attempt;
 		}
 	}
@@ -805,7 +805,7 @@ function load_user_stuff()
 		if (!array_key_exists('forum_type',$SITE_INFO)) $SITE_INFO['forum_type']='ocf';
 		require_code('forum/'.$SITE_INFO['forum_type']);	 // So we can at least get user details
 		$GLOBALS['FORUM_DRIVER']=object_factory('forum_driver_'.filter_naughty_harsh($SITE_INFO['forum_type']));
-		if (($SITE_INFO['forum_type']=='ocf') && (get_db_forums()==get_db_site()) && ($GLOBALS['FORUM_DRIVER']->get_drivered_table_prefix()==get_table_prefix()) && (!$GLOBALS['DEV_MODE'])) // NB: In debug mode needs separating so we can properly test our boundaries
+		if (($SITE_INFO['forum_type']=='ocf') && (get_db_forums()==get_db_site()) && ($GLOBALS['FORUM_DRIVER']->get_drivered_table_prefix()==get_table_prefix()))
 		{
 			$GLOBALS['FORUM_DRIVER']->connection=$GLOBALS['SITE_DB'];
 		}
@@ -1227,12 +1227,12 @@ function get_site_name()
 function in_safe_mode()
 {
 	global $SITE_INFO;
-	if ((isset($SITE_INFO['safe_mode'])) && ($SITE_INFO['safe_mode']=='1')) return true; // Useful for testing HPHP support
+	if ((isset($SITE_INFO['safe_mode'])) && ($SITE_INFO['safe_mode']=='1') && (!isset($_GET['keep_safe_mode']))) return true;
 
 	global $CHECKING_SAFEMODE;
 	if ($CHECKING_SAFEMODE) return false; // Stops infinite loops (e.g. Check safe mode > Check access > Check usergroups > Check implicit usergroup hooks > Check whether to look at custom implicit usergroup hooks [i.e. if not in safe mode])
 	$CHECKING_SAFEMODE=true;
-	$ret=((get_param_integer('keep_safe_mode',0)==1) && ((isset($GLOBALS['IS_ACTUALLY_ADMIN']) && ($GLOBALS['IS_ACTUALLY_ADMIN'])) || (!array_key_exists('FORUM_DRIVER',$GLOBALS)) || ($GLOBALS['FORUM_DRIVER']===NULL) || (!function_exists('get_member')) || ($GLOBALS['FORUM_DRIVER']->is_super_admin(get_member()))));
+	$ret=((get_param_integer('keep_safe_mode',0)==1) && ((isset($GLOBALS['IS_ACTUALLY_ADMIN']) && ($GLOBALS['IS_ACTUALLY_ADMIN'])) || (!array_key_exists('FORUM_DRIVER',$GLOBALS)) || ($GLOBALS['FORUM_DRIVER']===NULL) || (!function_exists('get_member')) || (empty($GLOBALS['MEMBER_CACHED'])) || ($GLOBALS['FORUM_DRIVER']->is_super_admin(get_member()))));
 	$CHECKING_SAFEMODE=false;
 	return $ret;
 }
@@ -1272,15 +1272,12 @@ function find_script($name,$append_keep=false,$base_url_code=0)
 	$zones=array_merge($zones,find_all_zones());
 	foreach ($zones as $zone)
 	{
-		if ($zone!='site') // If not found, we assume in here
+		if (is_file(get_file_base().'/'.$zone.'/'.$name.'.php'))
 		{
-			if (is_file(get_file_base().'/'.$zone.'/'.$name.'.php'))
-			{
-				$ret=get_base_url().'/'.$zone.(($zone!='')?'/':'').$name.'.php';
-				$CACHE_FIND_SCRIPT[$name][$append_keep][$base_url_code]=$ret;
-				if (function_exists('persistent_cache_set')) persistent_cache_set('SCRIPT_PLACES',$CACHE_FIND_SCRIPT,true);
-				return $ret.$append;
-			}
+			$ret=get_base_url().'/'.$zone.(($zone!='')?'/':'').$name.'.php';
+			$CACHE_FIND_SCRIPT[$name][$append_keep][$base_url_code]=$ret;
+			if (function_exists('persistent_cache_set')) persistent_cache_set('SCRIPT_PLACES',$CACHE_FIND_SCRIPT,true);
+			return $ret.$append;
 		}
 	}
 	$ret=get_base_url(($base_url_code==0)?NULL:($base_url_code==2)).'/site/'.$name.'.php';
@@ -1305,12 +1302,18 @@ function get_base_url($https=NULL,$zone_for=NULL)
 		if ($https===NULL)
 		{
 			require_code('urls');
-			if (get_option('enable_https',true)=='0')
+			if (running_script('index'))
 			{
-				$https=false;
+				if (get_option('enable_https',true)=='0')
+				{
+					$https=false;
+				} else
+				{
+					$https=function_exists('is_page_https') && function_exists('get_zone_name') && ((tacit_https()) || is_page_https(get_zone_name(),get_page_name()));
+				}
 			} else
 			{
-				$https=function_exists('is_page_https') && function_exists('get_zone_name') && ((tacit_https()) || is_page_https(get_zone_name(),get_page_name()));
+				$https=function_exists('tacit_https') && tacit_https();
 			}
 			$CURRENTLY_HTTPS=$https;
 		}
@@ -1335,7 +1338,7 @@ function get_base_url($https=NULL,$zone_for=NULL)
 		if ($colon_pos!==false) $domain=substr($domain,0,$colon_pos);
 		$port=ocp_srv('SERVER_PORT');
 		if (($port=='') || ($port=='80') || ($port=='443')) $port=''; else $port=':'.$port;
-			$SITE_INFO['base_url']='http://'.$domain.$port.str_replace('%2F','/',rawurlencode(preg_replace('#/'.str_replace('#','\#',preg_quote($GLOBALS['RELATIVE_PATH'])).'$#','',str_replace('\\','/',dirname(ocp_srv('PHP_SELF'))))));
+		$SITE_INFO['base_url']='http://'.$domain.$port.str_replace('%2F','/',rawurlencode(preg_replace('#/'.str_replace('#','\#',preg_quote($GLOBALS['RELATIVE_PATH'])).'$#','',str_replace('\\','/',dirname(ocp_srv('PHP_SELF'))))));
 	}
 
 	$base_url=$SITE_INFO['base_url'];
@@ -1410,15 +1413,18 @@ function get_complex_base_url($at)
  */
 function either_param($name,$default=false)
 {
-	$a=__param(array_merge($_POST,$_GET),$name,$default,false,NULL);
-	if ($a===NULL) return NULL;
+	$ret=__param(array_merge($_POST,$_GET),$name,$default);
+	if ($ret===NULL) return NULL;
 
-	if ($a!==$default) // Check input field security
-	{
-		require_code('input_filter');
-		check_input_field($name,$a);
-	}
-	return function_exists('ocp_url_decode_post_process')?ocp_url_decode_post_process($a):$a;
+	if ($ret===$default) return $ret;
+
+	if (strpos($ret,':')!==false && function_exists('ocp_url_decode_post_process'))
+		$ret=ocp_url_decode_post_process($ret);
+
+	require_code('input_filter');
+	check_input_field_string($name,$ret);
+
+	return $ret;
 }
 
 /**
@@ -1432,50 +1438,68 @@ function either_param($name,$default=false)
  */
 function post_param($name,$default=false,$html=false,$conv_from_wysiwyg=true)
 {
-	$a=__param($_POST,$name,$default,false,true);
+	$ret=__param($_POST,$name,$default,false,true);
 
-	if ($a===NULL) return NULL;
-	if ((trim($a)=='') && ($default!=='') && (array_key_exists('require__'.$name,$_POST)) && ($_POST['require__'.$name]!='0'))
+	if ($ret===NULL) return NULL;
+	if ((trim($ret)=='') && ($default!=='') && (array_key_exists('require__'.$name,$_POST)) && ($_POST['require__'.$name]!='0'))
 	{
 		require_code('failure');
 		improperly_filled_in_post($name);
 	}
 
-	if (($a!='') && (addon_installed('wordfilter')))
+	if (($ret!='') && (addon_installed('wordfilter')))
 	{
 		if ($name!='password')
 		{
 			require_code('word_filter');
-			if ($a!==$default) $a=check_word_filter($a,$name);
+			if ($ret!==$default) $ret=check_word_filter($ret,$name);
 		}
 	}
-	if ($a!==NULL) $a=unixify_line_format($a,NULL,$html);
+	if ($ret!==NULL) $ret=unixify_line_format($ret,NULL,$html);
 
 	if ((isset($_POST[$name.'__is_wysiwyg'])) && ($_POST[$name.'__is_wysiwyg']=='1') && ($conv_from_wysiwyg))
 	{
-		if (trim($a)=='')
+		if (trim($ret)=='')
 		{
-			$a='';
+			$ret='';
 		} else
 		{
 			require_code('comcode_from_html');
-			$a=trim(semihtml_to_comcode($a));
+			$ret=trim(semihtml_to_comcode($ret));
 		}
 	} else
 	{
-		if ((substr($a,0,10)=='[semihtml]') && (substr(trim($a),-11)=='[/semihtml]'))
+		if ((substr($ret,0,10)=='[semihtml]') && (substr(trim($ret),-11)=='[/semihtml]'))
 		{
-			$_a=trim($a);
-			$_a=substr($_a,10,strlen($_a)-11-10);
-			if (strpos($_a,'[semihtml')===false)
+			$_ret=trim($ret);
+			$_ret=substr($_ret,10,strlen($_ret)-11-10);
+			if (strpos($_ret,'[semihtml')===false)
 			{
 				require_code('comcode_from_html');
-				$a=trim(semihtml_to_comcode($_a));
+				$ret=trim(semihtml_to_comcode($_ret));
 			}
 		}
 	}
 
-	return function_exists('ocp_url_decode_post_process')?ocp_url_decode_post_process($a):$a;
+	require_code('input_filter');
+
+	if (($GLOBALS['BOOTSTRAPPING']==0) && ($GLOBALS['MICRO_AJAX_BOOTUP']==0))
+	{
+		if ($ret!==$default)
+			check_posted_field($name,$ret);
+
+		// Custom fields.xml filter system
+		$ret=filter_form_field_default($name,$ret);
+	}
+
+	if ($ret===$default) return $ret;
+
+	if (strpos($ret,':')!==false && function_exists('ocp_url_decode_post_process'))
+		$ret=ocp_url_decode_post_process($ret);
+
+	check_input_field_string($name,$ret,true);
+
+	return $ret;
 }
 
 /**
@@ -1483,13 +1507,13 @@ function post_param($name,$default=false,$html=false,$conv_from_wysiwyg=true)
  *
  * @param  ID_TEXT		The name of the parameter to get
  * @param  ?mixed			The default value to give the parameter if the parameter value is not defined (NULL: allow missing parameter) (false: give error on missing parameter)
- * @param  boolean		Whether to skip the security check
+ * @param  boolean		Whether to skip the security check. This currently does not do anything, it used to check for field length, but this was problematic in many situations without really raising security.
  * @return ?string		The parameter value (NULL: missing)
  */
 function get_param($name,$default=false,$no_security=false)
 {
-	$a=__param($_GET,$name,$default);
-	if (($a=='') && (isset($_GET['require__'.$name])) && ($default!==$a) && ($_GET['require__'.$name]!='0'))
+	$ret=__param($_GET,$name,$default);
+	if (($ret=='') && (isset($_GET['require__'.$name])) && ($default!==$ret) && ($_GET['require__'.$name]!='0'))
 	{
 		// We didn't give some required input
 		$GLOBALS['HTTP_STATUS_CODE']='400';
@@ -1499,41 +1523,16 @@ function get_param($name,$default=false,$no_security=false)
 		}
 		warn_exit(do_lang_tempcode('IMPROPERLY_FILLED_IN'));
 	}
-	if ($a===$default) return $a;
 
-	if (strpos($a,':')!==false)
-		$a=function_exists('ocp_url_decode_post_process')?ocp_url_decode_post_process($a):$a;
+	if ($ret===$default) return $ret;
 
-	// Security check
-	$is_url=($name=='from') || ($name=='preview_url') || ($name=='redirect') || ($name=='redirect_passon') || ($name=='url');
-	if (($name!='s_message') && (!$is_url) && (!$no_security))
-	{
-		if (((isset($a[100])) && (strpos(substr($a,10),'::slash::slash:')===false) && (strpos(substr($a,10),'://')===false) && (strpos(substr($a,10),'::slash::slash:')===false)) || (preg_match('#\n|\000|<|(".*[=<>])|\.\./|^\s*((((j\s*a\s*v\s*a\s*)|(v\s*b\s*))?s\s*c\s*r\s*i\s*p\s*t)|(d\s*a\s*t\s*a\s*))\s*:#mi',$a)!=0))
-		{
-			if ($name=='page') $_GET[$name]=''; // Stop loops
-			log_hack_attack_and_exit('DODGY_GET_HACK',$name,$a);
-		}
-	} else
-	{
-		if ($is_url)
-		{
-			if (preg_match('#\n|\000|<|(".*[=<>])|^\s*((((j\s*a\s*v\s*a\s*)|(v\s*b\s*))?s\s*c\s*r\s*i\s*p\s*t)|(d\s*a\s*t\s*a\s*))\s*:#mi',$a)!=0)
-			{
-				if ($name=='page') $_GET[$name]=''; // Stop loops
-				log_hack_attack_and_exit('DODGY_GET_HACK',$name,$a);
-			}
+	if (strpos($ret,':')!==false && function_exists('ocp_url_decode_post_process'))
+		$ret=ocp_url_decode_post_process($ret);
 
-			$bu=get_base_url(false);
-			$_a=str_replace('https://','http://',$a);
-			if ((looks_like_url($_a)) && (substr($_a,0,strlen($bu))!=$bu) && (substr($a,0,strlen(get_forum_base_url()))!=get_forum_base_url())) // Don't allow external redirections
-			{
-				$a=get_base_url(false);
-			}
-		}
-	}
+	require_code('input_filter');
+	check_input_field_string($name,$ret);
 
-	if ($a===NULL) return NULL;
-	return $a;
+	return $ret;
 }
 
 /**
@@ -1559,12 +1558,6 @@ function __param($array,$name,$default,$integer=false,$posted=false)
 	$val=$array[$name];
 	if (is_array($val)) $val=implode(',',$val);
 	if (get_magic_quotes_gpc()) $val=stripslashes($val);
-
-	if (($posted) && (count($_POST)!=0) && ($GLOBALS['BOOTSTRAPPING']==0) && ($GLOBALS['MICRO_AJAX_BOOTUP']==0)) // Check against fields.xml
-	{
-		require_code('input_filter');
-		return check_posted_field($name,$val);
-	}
 
 	return $val;
 }
@@ -1595,8 +1588,10 @@ function simulated_wildcard_match($context,$word,$full_cover=false)
  */
 function either_param_integer($name,$default=false)
 {
-	$ret=__param(array_merge($_POST,$_GET),$name,($default===false)?$default:(($default===NULL)?'':strval($default)),true,NULL); // $_REQUEST contains cookies too, so can't use
+	$ret=__param(array_merge($_POST,$_GET),$name,($default===false)?$default:(($default===NULL)?'':strval($default)),true); // $_REQUEST contains cookies too, so can't use
+
 	if (($default===NULL) && ($ret==='')) return NULL;
+
 	$ret=trim($ret);
 	if (!is_numeric($ret))
 	{
@@ -1604,11 +1599,13 @@ function either_param_integer($name,$default=false)
 		$ret=_param_invalid($name,$ret,true);
 	}
 	$reti=intval($ret);
-	if (($reti>2147483647) || ($reti<-2147483648))
+	$retf=floatval($reti);
+	if (($retf>2147483647.0) || ($retf<-2147483648.0))
 	{
 		require_code('failure');
 		_param_invalid($name,NULL,true);
 	}
+
 	return $reti;
 }
 
@@ -1622,7 +1619,18 @@ function either_param_integer($name,$default=false)
 function post_param_integer($name,$default=false)
 {
 	$ret=__param($_POST,$name,($default===false)?$default:(($default===NULL)?'':strval($default)),true,true);
+
+	if (($GLOBALS['BOOTSTRAPPING']==0) && ($GLOBALS['MICRO_AJAX_BOOTUP']==0))
+	{
+		if ($ret!==$default)
+			check_posted_field($name,$ret);
+
+		// Custom fields.xml filter system
+		$ret=filter_form_field_default($name,$ret);
+	}
+
 	if (($default===NULL) && ($ret==='')) return NULL;
+
 	$ret=trim($ret);
 	if (!is_numeric($ret))
 	{
@@ -1641,6 +1649,7 @@ function post_param_integer($name,$default=false)
 			_param_invalid($name,NULL,true);
 		}
 	}
+
 	return $reti;
 }
 
@@ -1656,7 +1665,9 @@ function get_param_integer($name,$default=false,$not_string_ok=false)
 {
 	$m_default=($default===false)?false:(isset($default)?(($default==0)?'0':strval($default)):'');
 	$ret=__param($_GET,$name,$m_default,true); // do not set $ret to mixed(), breaks bootstrapping
+
 	if ((!isset($default)) && ($ret==='')) return NULL;
+
 	$ret=trim($ret);
 	if (!is_numeric($ret))
 	{
@@ -1684,6 +1695,7 @@ function get_param_integer($name,$default=false,$not_string_ok=false)
 		require_code('failure');
 		_param_invalid($name,NULL,false);
 	}
+
 	return $reti;
 }
 
@@ -2116,10 +2128,10 @@ function convert_data_encodings($known_utf8=false)
 	//  If we don't have any PHP extensions (mbstring etc) that can perform the detection/conversion, our code will take this into account and use utf8_decode at points where it knows that it's being communicated with by Javascript.
 	if (@strlen(ini_get('unicode.runtime_encoding'))>0)
 	{
-		@ini_set('default_charset',$charset);
-		@ini_set('unicode.runtime_encoding',$charset);
-		@ini_set('unicode.output_encoding',$charset);
-		@ini_set('unicode.semantics','1');
+		safe_ini_set('default_charset',$charset);
+		safe_ini_set('unicode.runtime_encoding',$charset);
+		safe_ini_set('unicode.output_encoding',$charset);
+		safe_ini_set('unicode.semantics','1');
 
 		$done_something=true;
 	}
@@ -2134,10 +2146,40 @@ function convert_data_encodings($known_utf8=false)
 	elseif ((function_exists('iconv_set_encoding')) && (get_value('disable_iconv')!=='1'))
 	{
 		$encoding=$known_utf8?'UTF-8':$charset;
-		if (@iconv_set_encoding('input_encoding',$encoding))
+		if (!function_exists('iconv_set_encoding') || @iconv_set_encoding('input_encoding',$encoding))
 		{
-			iconv_set_encoding('output_encoding',$charset);
-			iconv_set_encoding('internal_encoding',$charset);
+			if (function_exists('iconv_set_encoding'))
+			{
+				@iconv_set_encoding('output_encoding',$charset);
+				@iconv_set_encoding('internal_encoding',$charset);
+			}
+			ini_set('default_charset',$charset);
+			foreach ($_GET as $key=>$val)
+			{
+				if (is_string($val))
+				{
+					$_GET[$key]=iconv($encoding,$charset.'//TRANSLIT',$val);
+				} elseif (is_array($val))
+				{
+					foreach ($val as $i=>$v)
+					{
+						$_GET[$key][$i]=iconv($encoding,$charset.'//TRANSLIT',$v);
+					}
+				}
+			}
+			foreach ($_POST as $key=>$val)
+			{
+				if (is_string($val))
+				{
+					$_POST[$key]=iconv($encoding,$charset.'//TRANSLIT',$val);
+				} elseif (is_array($val))
+				{
+					foreach ($val as $i=>$v)
+					{
+						$_POST[$key][$i]=iconv($encoding,$charset.'//TRANSLIT',$v);
+					}
+				}
+			}
 		} else
 		{
 			$VALID_ENCODING=false;

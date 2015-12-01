@@ -306,9 +306,14 @@ function semihtml_to_comcode($semihtml,$force=false)
 
 	if (ocp_trim($semihtml,strlen($semihtml)<30)=='') return '';
 
-	@ini_set('pcre.backtrack_limit','10000000');
+	safe_ini_set('pcre.backtrack_limit','10000000');
 
-	$semihtml=preg_replace_callback('#<input [^>]*class="ocp_keep_ui_controlled" [^>]*title="([^"]*)" [^>]*type="text" [^>]*value="[^"]*"[^>]*/?'.'>#siU','debuttonise',$semihtml);
+	do
+	{
+		$semihtml_before=$semihtml;
+		$semihtml=preg_replace_callback('#<input [^>]*class="ocp_keep_ui_controlled" [^>]*title="([^"]*)" [^>]*type="text" [^>]*value="[^"]*"[^>]*/?'.'>#siU','debuttonise',$semihtml_before);
+	}
+	while ($semihtml!=$semihtml_before);
 	$array_html_preg_replace=array();
 	$semihtml=str_replace('&#8203;','',$semihtml);
 	if (strtolower(get_charset())=='utf-8')
@@ -334,18 +339,21 @@ function semihtml_to_comcode($semihtml,$force=false)
 			$semihtml=convert_html_headers_to_titles($semihtml);
 		}
 
-		$count=substr_count($semihtml,'[/')+substr_count($semihtml,'{')+substr_count($semihtml,'[[')+substr_count($semihtml,'<h1');
-		if (($count==0) && (strpos($semihtml,'<h1')===false)) return ($semihtml=='')?'':('[html]'.$semihtml.'[/html]');
-		$count2=substr_count($semihtml,'[/attachment]')+substr_count($semihtml,'<h1');
-		if ($count2==$count) // All HTML or attachments or headers, so we can encode mostly as 'html' (as opposed to 'semihtml')
+		if (strpos($semihtml,'data:')===false)
 		{
-			if ($semihtml!='') $semihtml='[html]'.$semihtml.'[/html]';
-			$semihtml=preg_replace('#<h1[^>]*>\s*<span class="inner">(.*)</span>\s*</h1>#Us','[/html][semihtml][title]${1}[/title][/semihtml][html]',$semihtml);
-			$semihtml=preg_replace('#<h1[^>]*>(.*)</h1>#Us','[/html][semihtml][title]${1}[/title][/semihtml][html]',$semihtml);
-			$semihtml=str_replace('[attachment','[/html][semihtml][attachment',str_replace('[/attachment]','[/attachment][/semihtml][html]',$semihtml));
-			$semihtml=str_replace('[/html][html]','',$semihtml);
-			$semihtml=str_replace('[html][/html]','',$semihtml);
-			return $semihtml;
+			$count=substr_count($semihtml,'[/')+substr_count($semihtml,'{')+substr_count($semihtml,'[[')+substr_count($semihtml,'<h1');
+			if (($count==0) && (strpos($semihtml,'<h1')===false)) return ($semihtml=='')?'':('[html]'.$semihtml.'[/html]');
+			$count2=substr_count($semihtml,'[/attachment]')+substr_count($semihtml,'<h1');
+			if ($count2==$count) // All HTML or attachments or headers, so we can encode mostly as 'html' (as opposed to 'semihtml')
+			{
+				if ($semihtml!='') $semihtml='[html]'.$semihtml.'[/html]';
+				$semihtml=preg_replace('#<h1[^>]*>\s*<span class="inner">(.*)</span>\s*</h1>#Us','[/html][semihtml][title]${1}[/title][/semihtml][html]',$semihtml);
+				$semihtml=preg_replace('#<h1[^>]*>(.*)</h1>#Us','[/html][semihtml][title]${1}[/title][/semihtml][html]',$semihtml);
+				$semihtml=str_replace('[attachment','[/html][semihtml][attachment',str_replace('[/attachment]','[/attachment][/semihtml][html]',$semihtml));
+				$semihtml=str_replace('[/html][html]','',$semihtml);
+				$semihtml=str_replace('[html][/html]','',$semihtml);
+				return $semihtml;
+			}
 		}
 		if ($semihtml!='') $semihtml='[semihtml]'.$semihtml.'[/semihtml]';
 		$semihtml=preg_replace('#<h1[^>]*>\s*<span class="inner">(.*)</span>\s*</h1>#Us','[title]${1}[/title]',$semihtml);

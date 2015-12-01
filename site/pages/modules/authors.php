@@ -175,7 +175,7 @@ class Module_authors
 		$handle=get_author_id_from_name($author);
 		if (!is_null($handle))
 		{
-			$forum_details=do_template('AUTHOR_SCREEN_POTENTIAL_ACTION_ENTRY',array('ACTION'=>hyperlink($GLOBALS['FORUM_DRIVER']->member_profile_url($handle,false,true),do_lang_tempcode('AUTHOR_PROFILE'),false,false,'',NULL,NULL,'me')));
+			$forum_details=do_template('AUTHOR_SCREEN_POTENTIAL_ACTION_ENTRY',array('ACTION'=>hyperlink($GLOBALS['FORUM_DRIVER']->member_profile_url($handle,true,true),do_lang_tempcode('AUTHOR_PROFILE'),false,false,'',NULL,NULL,'me')));
 			if (addon_installed('points'))
 			{
 				$give_points_url=build_url(array('page'=>'points','type'=>'member','id'=>$handle),get_module_zone('points'));
@@ -273,7 +273,7 @@ class Module_authors
 		$edit_url=new ocp_tempcode();
 		if (has_edit_author_permission(get_member(),$author))
 		{
-			$edit_url=build_url(array('page'=>'cms_authors','type'=>'_ad','id'=>$author),'cms');
+			$edit_url=build_url(array('page'=>'cms_authors','type'=>'_ad','author'=>$author),get_module_zone('cms_authors'));
 		}
 
 		return do_template('AUTHOR_SCREEN',array('_GUID'=>'ea789367b15bc90fc28d1c586e6e6536','TAGS'=>get_loaded_tags(),'TITLE'=>$title,'EDIT_URL'=>$edit_url,'AUTHOR'=>$author,'NEWS_RELEASED'=>$news_released,'DOWNLOADS_RELEASED'=>$downloads_released,'STAFF_DETAILS'=>$staff_details,'POINT_DETAILS'=>$point_details,'SEARCH_DETAILS'=>$search_details,'URL_DETAILS'=>$url_details,'FORUM_DETAILS'=>$forum_details,'SKILLS'=>$skills,'DESCRIPTION'=>$description));

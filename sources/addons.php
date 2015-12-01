@@ -184,7 +184,7 @@ function find_installed_addons($just_non_bundled=false)
 				'addon_organisation'=>'ocProducts',
 				'addon_version'=>($version==ocp_version_number())?ocp_version_pretty():float_format($version,1),
 				'addon_description'=>$description,
-				'addon_install_time'=>filemtime(get_file_base().'/sources/hooks/systems/addon_registry/'.$hook.'.php'),
+				'addon_install_time'=>filemtime($path),
 				'addon_files'=>implode(chr(10),make_global_file_list($file_list)),
 			);
 		}
@@ -205,7 +205,7 @@ function find_addon_effective_mtime($addon_name)
 	$mtime=mixed();
 	foreach ($files_rows as $filename)
 	{
-		if (file_exists(get_file_base().'/'.$filename))
+		if (@file_exists(get_file_base().'/'.$filename)) //@d due to possible bad file paths
 		{
 			$_mtime=filemtime(get_file_base().'/'.$filename);
 			$mtime=is_null($mtime)?$_mtime:max($mtime,$_mtime);
@@ -326,14 +326,14 @@ function read_addon_info($name)
 		$addon_row['addon_dependencies_on_this']=find_addon_dependencies_on($name);
 	} else
 	{
-		if (!file_exists(get_file_base().'/sources/hooks/systems/addon_registry/'.filter_naughty_harsh($name,true).'.php'))
+		$path=get_file_base().'/sources_custom/hooks/systems/addon_registry/'.filter_naughty_harsh($name,true).'.php';
+		if (!file_exists($path))
+			$path=get_file_base().'/sources/hooks/systems/addon_registry/'.filter_naughty_harsh($name,true).'.php';
+
+		if (!file_exists($path))
 		{
 			warn_exit(do_lang_tempcode('MISSING_RESOURCE'));
 		}
-
-		$path=get_file_base().'/sources_custom/hooks/systems/addon_registry/'.filter_naughty_harsh($name).'.php';
-		if (!file_exists($path))
-			$path=get_file_base().'/sources/hooks/systems/addon_registry/'.filter_naughty_harsh($name).'.php';
 
 		$_hook_bits=extract_module_functions($path,array('get_dependencies','get_version','get_description','get_file_list'));
 		if (is_null($_hook_bits[0]))
@@ -359,7 +359,7 @@ function read_addon_info($name)
 			'addon_organisation'=>'ocProducts',
 			'addon_version'=>float_to_raw_string($version,2,true),
 			'addon_description'=>$description,
-			'addon_install_time'=>filemtime(get_file_base().'/sources/hooks/systems/addon_registry/'.$name.'.php'),
+			'addon_install_time'=>filemtime($path),
 			'addon_files'=>make_global_file_list($file_list),
 			'addon_dependencies'=>$dep['requires'],
 			'addon_dependencies_on_this'=>find_addon_dependencies_on($name),
@@ -586,7 +586,9 @@ function install_addon($file,$files=NULL)
 				{
 					require_code('menus2');
 					add_menu_item_simple('zone_menu',NULL,$zone,$zone.':',0,1);
-					$GLOBALS['SITE_DB']->query_insert('zones',array('zone_name'=>$zone,'zone_title'=>insert_lang($zone,1),'zone_default_page'=>'start','zone_header_text'=>insert_lang('???',2),'zone_theme'=>'default','zone_wide'=>0,'zone_require_session'=>0,'zone_displayed_in_menu'=>1));
+					$zone_default_page='start';
+					if ($zone=='forum') $zone_default_page='forumview'; // A bit of an architectural fudge, but people get confused why it doesn't come back the same
+					$GLOBALS['SITE_DB']->query_insert('zones',array('zone_name'=>$zone,'zone_title'=>insert_lang($zone,1),'zone_default_page'=>$zone_default_page,'zone_header_text'=>insert_lang('???',2),'zone_theme'=>'default','zone_wide'=>0,'zone_require_session'=>0,'zone_displayed_in_menu'=>1));
 
 					$groups=$GLOBALS['FORUM_DRIVER']->get_usergroup_list(false,true);
 					foreach (array_keys($groups) as $group_id)
@@ -621,7 +623,7 @@ function install_addon($file,$files=NULL)
 		}
 	}
 
-	// Install news blocks
+	// Install new blocks
 	foreach ($directory as $dir)
 	{
 		$addon_file=$dir['path'];
@@ -792,6 +794,14 @@ function inform_about_addon_install($file,$also_uninstalling=NULL,$also_installi
 		if (substr($entry['path'],-1)=='/') continue;
 
 		$data=(strtolower(substr($entry['path'],-4,4))=='.tpl')?tar_get_file($tar,$entry['path'],true):NULL;
+
+		// check valid path
+		$php_errormsg=mixed();
+		@file_exists(get_file_base().'/'.$entry['path']); //@d due to possible bad file paths
+		if ((isset($php_errormsg)) && (strpos($php_errormsg,'be a valid path')!==false))
+		{
+			warn_exit(do_lang_tempcode('CORRUPT_TAR'));
+		}
 
 		// .php?
 		if ((strtolower(substr($entry['path'],-4,4))=='.php') || ((!is_null($data)) && ((strpos($data['data'],'{+START,PHP')!==false) || (strpos($data['data'],'<'.'?php')!==false))))
@@ -967,14 +977,15 @@ function has_feature($dependency)
 	$test=$GLOBALS['SITE_DB']->query_value_null_ok('addons','addon_name',array('addon_name'=>$dependency));
 	if (!is_null($test)) return true;
 
-	// Bundled addon
+	// Bundled/new-style addon
+	if (file_exists(get_file_base().'/sources_custom/hooks/systems/addon_registry/'.$dependency.'.php')) return true;
 	if (file_exists(get_file_base().'/sources/hooks/systems/addon_registry/'.$dependency.'.php')) return true;
 
 	// Some other features
 	if (($dependency=='javascript') && (has_js())) return true;
 	if (($dependency=='cron') && (cron_installed())) return true;
 	if (($dependency=='ocf') && (get_forum_type()=='ocf')) return true;
-	if ((strtolower($dependency)=='gd') && (get_option('is_on_gd')=='1') && (function_exists('imagecreatefromstring'))) return true;
+	if ((strtolower($dependency)=='gd') && (get_option('is_on_gd')=='1') && (function_exists('imagepng'))) return true;
 	if ($dependency=='adobeflash') return true;
 	if (substr($dependency,0,3)=='php')
 	{

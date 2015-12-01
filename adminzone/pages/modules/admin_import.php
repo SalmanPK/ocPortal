@@ -135,6 +135,8 @@ class Module_admin_import
 		require_code('import');
 		load_import_deps();
 
+		$GLOBALS['LAX_COMCODE']=true;
+
 		set_mass_import_mode();
 
 		// Decide what we're doing
@@ -554,10 +556,10 @@ class Module_admin_import
 		if (function_exists('set_time_limit'))
 		{
 			@set_time_limit($refresh_time);
-			@ini_set('display_errors','0'); // So that the timeout message does not show, which made the user not think the refresh was going to happen automatically, and could thus result in double-requests
+			safe_ini_set('display_errors','0'); // So that the timeout message does not show, which made the user not think the refresh was going to happen automatically, and could thus result in double-requests
 		}
 		header('Content-type: text/html; charset='.get_charset());
-		@ini_set('log_errors','0');
+		safe_ini_set('log_errors','0');
 		global $I_REFRESH_URL;
 		$I_REFRESH_URL=$refresh_url;
 

@@ -172,19 +172,18 @@ function banners_script($ret=false,$type=NULL,$dest=NULL,$b_type=NULL,$source=NU
 		}
 
 		// Remove ones already shown on this page-view
-		static $shown_already=array();
+		static $shown_already=array(); // NB: Holds shown ones for any banner types, not specifically the restraints we are working on here. This could be true if you have multiple banner spots: count($shown_already)>count($rows)
 		if (!running_script('banner'))
 		{
-			if (count($shown_already)<count($rows))
+			$old_rows=$rows;
+			foreach ($rows as $counter=>$myrow)
 			{
-				foreach ($rows as $counter=>$myrow)
+				if (array_key_exists($myrow['name'],$shown_already))
 				{
-					if (array_key_exists($myrow['name'],$shown_already))
-					{
-						unset($rows[$counter]);
-					}
+					unset($rows[$counter]);
 				}
 			}
+			if (count($rows)==0) $rows=$old_rows;
 		}
 
 		// Count the total of all importance_modulus entries
@@ -256,8 +255,8 @@ function banners_script($ret=false,$type=NULL,$dest=NULL,$b_type=NULL,$source=NU
 /**
  * Get a nice, formatted XHTML list to select a banner type
  *
- * @param  ?ID_TEXT		The currently selected licence (NULL: none selected)
- * @return tempcode		The list of categories
+ * @param  ?ID_TEXT		The currently selected banner type (NULL: none selected)
+ * @return tempcode		The list of banner types
  */
 function nice_get_banner_types($it=NULL)
 {

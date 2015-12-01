@@ -127,14 +127,14 @@ class Module_login
 		$login_url=build_url(array('page'=>'_SELF','type'=>'login'),'_SELF');
 
 		// Test to see if we have any redirect issue that blocks form submissions
-		if (ocp_srv('HTTP_USER_AGENT')!='ocPortal' && strpos(ocp_srv('HTTP_REFERER'),'logout')===false)
+		if (ocp_srv('HTTP_USER_AGENT')!='ocPortal' && strpos(ocp_srv('HTTP_REFERER'),'logout')===false && running_script('index'))
 		{
 			$this_proper_url=build_url(array('page'=>'_SELF','type'=>'misc'),'_SELF');
 			$_login_url=$this_proper_url->evaluate();
 			$test=http_download_file($_login_url,0,false,true); // Should return a 200 blank, not an HTTP error or a redirect; actual data would be an ocP error
 			if ((is_null($test)) && ($GLOBALS['HTTP_MESSAGE']!=='200') && ($GLOBALS['HTTP_MESSAGE']!=='401') && ((!is_file(get_file_base().'/install.php')) || ($GLOBALS['HTTP_MESSAGE']!=='500')))
 			{
-				if (($GLOBALS['HTTP_MESSAGE']=='no-data') && (get_option('ip_forwarding')=='0'))
+				if ((($GLOBALS['HTTP_MESSAGE']=='no-data') || (strpos($GLOBALS['HTTP_MESSAGE'],'Connection refused')!==false)) && (get_option('ip_forwarding')=='0'))
 				{
 					attach_message(do_lang_tempcode('config:ENABLE_IP_FORWARDING',do_lang('config:IP_FORWARDING')),'warn');
 				} else

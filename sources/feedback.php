@@ -170,6 +170,31 @@ function may_view_content_behind_feedback_code($member_id,$content_type,$content
 		}
 	}
 
+	// FUDGEFUDGE: Extra check for private topics
+	$topic_id=NULL;
+	if (($content_type=='post') && (get_forum_type()=='ocf'))
+	{
+		$post_rows=$GLOBALS['FORUM_DB']->query_select('f_posts',array('p_topic_id','p_intended_solely_for','p_poster'),array('id'=>intval($content_id)),'',1);
+		if (!array_key_exists(0,$post_rows))
+			return false;
+		if ($post_rows[0]['p_intended_solely_for']!==NULL && ($post_rows[0]['p_intended_solely_for']!=$member_id && $post_rows[0]['p_poster']!=$member_id || is_guest($member_id)))
+			return false;
+		$topic_id=$post_rows[0]['p_topic_id'];
+	}
+	if (($content_type=='topic') && (get_forum_type()=='ocf'))
+	{
+		$topic_id=intval($content_id);
+	}
+	if (!is_null($topic_id))
+	{
+		$topic_rows=$GLOBALS['FORUM_DB']->query_select('f_topics',array('t_forum_id','t_pt_from','t_pt_to'),array('id'=>$topic_id),'',1);
+		if (!array_key_exists(0,$topic_rows))
+			return false;
+		require_code('ocf_topics');
+		if ($topic_rows[0]['t_forum_id']==NULL && ($topic_rows[0]['t_pt_from']!=$member_id && $topic_rows[0]['t_pt_to']!=$member_id && !ocf_has_special_pt_access($topic_id,$member_id) || is_guest($member_id)))
+			return false;
+	}
+
 	return ((has_actual_page_access($member_id,$module)) && (($permission_type_code=='') || (is_null($category_id)) || (has_category_access($member_id,$permission_type_code,$category_id))));
 }
 
@@ -604,7 +629,9 @@ function actualise_specific_rating($rating,$page_name,$member_id,$content_type,$
 				$award_content_row=content_get_row($content_id,$award_ob->info());
 				if (!is_null($award_content_row))
 				{
-					$rendered_award=preg_replace('#keep_session=\d*#','filtered=1',static_evaluate_tempcode($award_ob->run($award_content_row,'_SEARCH')));
+					$rendered_award=static_evaluate_tempcode($award_ob->run($award_content_row,'_SEARCH'));
+					$rendered_award=preg_replace('#keep_session=\d*#','filtered=1',$rendered_award);
+					$rendered_award=preg_replace('#keep_devtest=\d*#','filtered=1',$rendered_award);
 				}
 			}
 			$mail=do_lang('CONTENT_LIKED_NOTIFICATION_MAIL',comcode_escape(get_site_name()),comcode_escape(($content_title=='')?ocp_mb_strtolower($content_type_title):$content_title),array(comcode_escape(is_object($safe_content_url)?$safe_content_url->evaluate():$safe_content_url),$rendered_award,comcode_escape($GLOBALS['FORUM_DRIVER']->get_username(get_member()))));
@@ -612,14 +639,19 @@ function actualise_specific_rating($rating,$page_name,$member_id,$content_type,$
 		}
 
 		// Put on activity wall / whatever
-		$real_content_type=convert_ocportal_type_codes('feedback_type_code',$content_type,'content_type');
+		$real_content_type=convert_ocportal_type_codes('feedback_type_code',$content_type,'cma_hook');
 		if (may_view_content_behind_feedback_code($GLOBALS['FORUM_DRIVER']->get_guest_id(),$real_content_type,$content_id))
 		{
 			if (is_null($submitter)) $submitter=$GLOBALS['FORUM_DRIVER']->get_guest_id();
 
 			$activity_type=((is_null($submitter)) || (is_guest($submitter)))?'_ACTIVITY_LIKES':'ACTIVITY_LIKES';
 			$_safe_content_url=is_object($safe_content_url)?$safe_content_url->evaluate():$safe_content_url;
-			if ($_safe_content_url=='') $_safe_content_url=preg_replace('#keep_session=\d*#','filtered=1',is_object($content_url)?$content_url->evaluate():$content_url);
+			if ($_safe_content_url=='')
+			{
+				$_safe_content_url=is_object($content_url)?$content_url->evaluate():$content_url;
+				$_safe_content_url=preg_replace('#keep_session=\d*#','filtered=1',$_safe_content_url);
+				$_safe_content_url=preg_replace('#keep_devtest=\d*#','filtered=1',$_safe_content_url);
+			}
 			$content_pagelink=url_to_pagelink($_safe_content_url);
 			if ($content_title=='')
 			{
@@ -729,6 +761,8 @@ function actualise_post_comment($allow_comments,$content_type,$content_id,$conte
 	if ((is_null($post_title)) && (!$forum_tie)) return false;
 
 	$post=post_param('post','');
+	if ($post==do_lang('POST_WARNING')) $post='';
+	if ($post==do_lang('THREADED_REPLY_NOTICE',do_lang('POST_WARNING'))) $post='';
 	if (!is_null($post_title))
 	{
 		if (($post=='') && ($post_title!=''))
@@ -849,7 +883,7 @@ function actualise_post_comment($allow_comments,$content_type,$content_id,$conte
 		$username=$GLOBALS['FORUM_DRIVER']->get_username(get_member());
 		$subject=do_lang('NEW_COMMENT_SUBJECT',get_site_name(),($content_title=='')?ocp_mb_strtolower($content_type_title):$content_title,array($post_title,$username),get_site_default_lang());
 		$username=$GLOBALS['FORUM_DRIVER']->get_username(get_member());
-		$message_raw=do_lang('NEW_COMMENT_BODY',comcode_escape(get_site_name()),comcode_escape(($content_title=='')?ocp_mb_strtolower($content_type_title):$content_title),array($post_title,post_param('post'),comcode_escape($content_url_flat),comcode_escape($username)),get_site_default_lang());
+		$message_raw=do_lang('NEW_COMMENT_BODY',comcode_escape(get_site_name()),comcode_escape(($content_title=='')?ocp_mb_strtolower($content_type_title):$content_title),array(($post_title=='')?do_lang('NO_SUBJECT'):$post_title,post_param('post'),comcode_escape($content_url_flat),comcode_escape($username)),get_site_default_lang());
 		dispatch_notification('comment_posted',$content_type.'_'.$content_id,$subject,$message_raw);
 
 		// Is the user gonna automatically enable notifications for this?
@@ -861,13 +895,18 @@ function actualise_post_comment($allow_comments,$content_type,$content_id,$conte
 		}
 
 		// Activity
-		$real_content_type=convert_ocportal_type_codes('feedback_type_code',$content_type,'content_type');
+		$real_content_type=convert_ocportal_type_codes('feedback_type_code',$content_type,'cma_hook');
 		if (may_view_content_behind_feedback_code($GLOBALS['FORUM_DRIVER']->get_guest_id(),$real_content_type,$content_id))
 		{
 			if (is_null($submitter)) $submitter=$GLOBALS['FORUM_DRIVER']->get_guest_id();
 			$activity_type=((is_null($submitter)) || (is_guest($submitter)))?'_ADDED_COMMENT_ON':'ADDED_COMMENT_ON';
 			$_safe_content_url=is_object($safe_content_url)?$safe_content_url->evaluate():$safe_content_url;
-			if ($_safe_content_url=='') $_safe_content_url=preg_replace('#keep_session=\d*#','filtered=1',is_object($content_url)?$content_url->evaluate():$content_url);
+			if ($_safe_content_url=='')
+			{
+				$_safe_content_url=is_object($content_url)?$content_url->evaluate():$content_url;
+				$_safe_content_url=preg_replace('#keep_session=\d*#','filtered=1',$_safe_content_url);
+				$_safe_content_url=preg_replace('#keep_devtest=\d*#','filtered=1',$_safe_content_url);
+			}
 			$content_pagelink=url_to_pagelink($_safe_content_url);
 			if ($content_title=='')
 			{

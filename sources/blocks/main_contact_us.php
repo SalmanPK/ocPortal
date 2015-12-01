@@ -72,6 +72,16 @@ class Block_main_contact_us
 				enforce_captcha();
 			}
 
+			$email_from=trim(post_param('email',$GLOBALS['FORUM_DRIVER']->get_member_email_address(get_member())));
+			if ($email_from!='')
+			{
+				require_code('type_validation');
+				if (!is_valid_email_address($email_from))
+				{
+					warn_exit(do_lang_tempcode('INVALID_EMAIL_ADDRESS'));
+				}
+			}
+
 			// Handle notifications
 			require_code('notifications');
 			$notification_subject=do_lang('CONTACT_US_NOTIFICATION_SUBJECT',$title,NULL,NULL,get_site_default_lang());
@@ -79,12 +89,13 @@ class Block_main_contact_us
 			dispatch_notification('messaging',$type.'_'.$id,$notification_subject,$notification_message,NULL,NULL,3,true);
 
 			// Send standard confirmation email to current user
-			$email_from=trim(post_param('email',$GLOBALS['FORUM_DRIVER']->get_member_email_address(get_member())));
 			if ($email_from!='')
 			{
 				require_code('mail');
 				mail_wrap(do_lang('YOUR_MESSAGE_WAS_SENT_SUBJECT',$title),do_lang('YOUR_MESSAGE_WAS_SENT_BODY',$post),array($email_from),NULL,'','',3,NULL,false,get_member());
 			}
+
+			decache('main_staff_checklist');
 		} else
 		{
 			$message=new ocp_tempcode();

@@ -40,10 +40,13 @@ if (!function_exists('init__comcode_text'))
 					$ahead=preg_replace_callback(\'#\'.$w.\'#\',\'obscure_html_callback\',$ahead);
 				}
 			}
+
+			hard_filter_input_data__html($ahead);
 		';
-		$in=str_replace('// Null vector',$new_code,$in);
+		$in=str_replace('hard_filter_input_data__html($ahead);',$new_code,$in);
 
 		$new_code='
+			require_code(\'input_filter\');
 			foreach ($OBSCURE_REPLACEMENTS as $rep=>$from)
 			{
 				$ahead=str_replace($rep,$from,$ahead);
@@ -62,4 +65,3 @@ function obscure_html_callback($matches)
 	$OBSCURE_REPLACEMENTS[$rep]=$matches[0];
 	return $rep;
 }
-

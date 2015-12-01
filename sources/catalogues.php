@@ -549,14 +549,14 @@ function get_catalogue_entries($catalogue_name,$category_id,$max,$start,$select,
 	if (is_null($num_entries))
 		$num_entries=$GLOBALS['SITE_DB']->query_value_null_ok_full('SELECT COUNT(*) FROM '.get_table_prefix().'catalogue_entries r'.implode('',$extra_join).' WHERE '.$where_clause);
 
-	if ($num_entries>300) // Needed to stop huge slow down, so reduce to sorting by ID
+	$in_db_sorting=$do_sorting && $can_do_db_sorting; // This defines whether $virtual_order_by can actually be used in SQL (if not, we have to sort manually)
+	if (!$in_db_sorting && $num_entries>300) // Needed to stop huge slow down, so reduce to sorting by ID
 	{
 		$in_db_sorting=true;
 		$virtual_order_by='r.id';
 	}
 
 	$sql='SELECT r.*'.implode('',$extra_select).' FROM '.get_table_prefix().'catalogue_entries r'.implode('',$extra_join).' WHERE '.$where_clause;
-	$in_db_sorting=$do_sorting && $can_do_db_sorting; // This defines whether $virtual_order_by can actually be used in SQL (if not, we have to sort manually)
 	if ($in_db_sorting && $do_sorting) $sql.=' ORDER BY '.$virtual_order_by.' '.$direction;
 
 	if ($max>0)
@@ -1145,7 +1145,7 @@ function get_catalogue_entries_tree($catalogue_name,$submitter=NULL,$category_id
 
 	if (is_null($category_id))
 	{
-		$is_tree=$GLOBALS['SITE_DB']->query_value_null_ok('catalogues','c_is_tree',array('c_name'=>$catalogue_name),'',1);
+		$is_tree=$GLOBALS['SITE_DB']->query_value_null_ok('catalogues','c_is_tree',array('c_name'=>$catalogue_name));
 		if (is_null($is_tree)) return array();
 		if ($is_tree==0)
 		{
@@ -1289,7 +1289,10 @@ function nice_get_catalogue_category_tree($catalogue_name,$it=NULL,$addable_filt
  */
 function get_catalogue_category_tree($catalogue_name,$category_id,$breadcrumbs=NULL,$title=NULL,$levels=NULL,$addable_filter=false,$use_compound_list=false)
 {
-	if ($levels==-1) return array();
+	if (!$use_compound_list)
+	{
+		if ($levels==-1) return array();
+	}
 
 	if (!has_category_access(get_member(),'catalogues_catalogue',$catalogue_name)) return array();
 	if ((!is_null($category_id)) && (get_value('disable_cat_cat_perms')!=='1') && (!has_category_access(get_member(),'catalogues_category',strval($category_id)))) return array();
@@ -1342,7 +1345,7 @@ function get_catalogue_category_tree($catalogue_name,$category_id,$breadcrumbs=N
 	usort($rows,'multi_sort');
 	$no_root=!array_key_exists(0,$children);
 	if (!$no_root) $children[0]['child_count']=count($rows);
-	if ($levels!==0)
+	if (($levels!==0) || ($use_compound_list))
 	{
 		foreach ($rows as $child)
 		{
@@ -1360,7 +1363,8 @@ function get_catalogue_category_tree($catalogue_name,$category_id,$breadcrumbs=N
 					if (!$no_root) $children[0]['compound_list'].=$_compound_list;
 				}
 
-				$children=array_merge($children,$child_children);
+				if ($levels!==0)
+					$children=array_merge($children,$child_children);
 			}
 		}
 	}
@@ -1573,12 +1577,12 @@ function render_catalogue_entry_screen($id,$no_title=false)
 	{
 		$map['BREADCRUMBS']=new ocp_tempcode();
 		$url=build_url(array('page'=>'_SELF','type'=>'index','id'=>$catalogue_name),'_SELF');
-		$map['BREADCRUMBS']->attach(hyperlink($url,escape_html(get_translated_text($catalogue['c_title'])),false,false,do_lang('INDEX')));
+		$map['BREADCRUMBS']->attach(hyperlink($url,get_translated_text($catalogue['c_title']),false,true,do_lang('INDEX')));
 		$map['BREADCRUMBS']->attach(do_template('BREADCRUMB_SEPARATOR'));
 		$url_map=array('page'=>'_SELF','type'=>'category','id'=>$category['id']);
 		if (get_page_name()=='catalogues') $url_map+=propagate_ocselect();
 		$url=build_url($url_map,'_SELF');
-		$map['BREADCRUMBS']->attach(hyperlink($url,escape_html(get_translated_text($category['cc_title'])),false,false,do_lang('GO_BACKWARDS_TO',get_translated_text($category['cc_title'])),NULL,NULL,'up'));
+		$map['BREADCRUMBS']->attach(hyperlink($url,get_translated_text($category['cc_title']),false,true,do_lang('GO_BACKWARDS_TO',get_translated_text($category['cc_title'])),NULL,NULL,'up'));
 	}
 	$map['CATEGORY_TITLE']=get_translated_text($category['cc_title']);
 	$map['CAT']=strval($entry['cc_id']);
@@ -1594,7 +1598,7 @@ function render_catalogue_entry_screen($id,$no_title=false)
 		'publisher'=>'', // blank means same as creator
 		'modified'=>is_null($entry['ce_edit_date'])?'':date('Y-m-d',$entry['ce_edit_date']),
 		'type'=>get_translated_text($catalogue['c_title']).' entry',
-		'title'=>$title_to_use_2,
+		'title'=>comcode_escape($title_to_use_2),
 		'identifier'=>'_SEARCH:catalogues:entry:'.strval($id),
 		'description'=>'',
 	);

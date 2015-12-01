@@ -168,7 +168,7 @@ class Hook_search_comcode_pages
 			{
 				if (!has_zone_access(get_member(),$zone)) continue;
 
-				$pages=find_all_pages($zone,'comcode/'.user_lang(),'txt')+find_all_pages($zone,'comcode_custom/'.user_lang(),'txt')+find_all_pages($zone,'comcode/'.get_site_default_lang(),'txt')+find_all_pages($zone,'comcode_custom/'.get_site_default_lang(),'txt');
+				$pages=find_all_pages_wrap($zone,false,false,FIND_ALL_PAGES__PERFORMANT,'comcode');
 				foreach ($pages as $page=>$dir)
 				{
 					if (!is_string($page)) $page=strval($page);
@@ -191,6 +191,7 @@ class Hook_search_comcode_pages
 						$path=zone_black_magic_filterer((($dir=='comcode_custom')?get_custom_file_base():get_file_base()).'/'.$zone.'/pages/'.$dir.'/'.$page.'.txt');
 						if ((!is_null($cutoff)) && (filemtime($path)<$cutoff)) continue;
 						$contents=file_get_contents($path);
+						if ($only_titles) $contents=preg_replace('#^.*\[title(="1")?\](.*)\[/title\].*$#Us','${2}',$contents);
 
 						if (in_memory_search_match(array('content'=>$content,'conjunctive_operator'=>$boolean_operator),$contents))
 						{
@@ -256,11 +257,10 @@ class Hook_search_comcode_pages
 
 		if ($summary=='')
 		{
-			$comcode_file=zone_black_magic_filterer(get_custom_file_base().'/'.filter_naughty($zone).'/pages/comcode_custom/'.get_site_default_lang().'/'.filter_naughty($page).'.txt');
-			if (!file_exists($comcode_file))
-			{
-				$comcode_file=zone_black_magic_filterer(get_file_base().'/'.filter_naughty($zone).'/pages/comcode/'.get_site_default_lang().'/'.filter_naughty($page).'.txt');
-			}
+			$page_request=_request_page($page,$zone);
+			if (strpos($page_request[0],'COMCODE')===false) return new ocp_tempcode();
+			$comcode_file=$page_request[count($page_request)-1];
+
 			if (file_exists($comcode_file))
 			{
 				global $LAX_COMCODE;
@@ -282,6 +282,7 @@ class Hook_search_comcode_pages
 				$GLOBALS['OVERRIDE_SELF_ZONE']=$zone;
 				$backup_search__contents_bits=$SEARCH__CONTENT_BITS;
 				$SEARCH__CONTENT_BITS=NULL; // We do not want highlighting, as it'll result in far too much Comcode being parsed (ok for short snippets, not many full pages!)
+				$GLOBALS['TEMPCODE_SETGET']['no_comcode_page_edit_links']='1';
 				$temp_summary=request_page($page,true,$zone,strpos($comcode_file,'/comcode_custom/')?'comcode_custom':'comcode',true);
 				$SEARCH__CONTENT_BITS=$backup_search__contents_bits;
 				$GLOBALS['OVERRIDE_SELF_ZONE']=NULL;
@@ -291,6 +292,8 @@ class Hook_search_comcode_pages
 				$LOADED_PAGES=array(); // Decache this, or we'll eat up a tonne of RAM
 
 				$summary=generate_text_summary($_temp_summary,is_null($SEARCH__CONTENT_BITS)?array():$SEARCH__CONTENT_BITS);
+
+				$GLOBALS['TEMPCODE_SETGET']['no_comcode_page_edit_links']='0';
 			}
 		}
 
@@ -299,7 +302,7 @@ class Hook_search_comcode_pages
 		global $LAST_COMCODE_PARSED_TITLE;
 
 		if ($LAST_COMCODE_PARSED_TITLE!='')
-			$title=do_lang_tempcode('_SEARCH_RESULT_COMCODE_PAGE_NICE',$LAST_COMCODE_PARSED_TITLE);
+			$title=do_lang_tempcode('_SEARCH_RESULT_COMCODE_PAGE_NICE',escape_html($LAST_COMCODE_PARSED_TITLE));
 
 		$breadcrumbs=comcode_breadcrumbs($page,$zone);
 

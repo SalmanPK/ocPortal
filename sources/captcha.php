@@ -31,7 +31,7 @@ function init__captcha()
  */
 function captcha_script()
 {
-	if (!function_exists('imagecreatefromstring')) warn_exit(do_lang_tempcode('GD_NEEDED'));
+	if (!function_exists('imagepng')) warn_exit(do_lang_tempcode('GD_NEEDED'));
 
 	$_code_needed=$GLOBALS['SITE_DB']->query_value_null_ok('security_images','si_code',array('si_session_id'=>get_session_id()));
 	if (is_null($_code_needed))
@@ -62,7 +62,7 @@ function captcha_script()
 	}
 	mt_srand($_code_needed); // Important: to stop averaging out of different attempts. This makes the distortion consistent for that particular code.
 
-	@ini_set('ocproducts.xss_detect','0');
+	safe_ini_set('ocproducts.xss_detect','0');
 
 	$mode=get_param('mode','');
 	if ($mode=='audio')
@@ -105,7 +105,7 @@ function captcha_script()
 			fclose($myfile);
 		}
 
-		@ini_set('zlib.output_compression','Off');
+		safe_ini_set('zlib.output_compression','Off');
 
 		// Fix up header
 		$data=substr_replace($data,pack('V',strlen($data)-8),4,4);
@@ -325,7 +325,10 @@ function check_captcha($code_entered,$regenerate_on_error=true)
 		$_code_needed=$GLOBALS['SITE_DB']->query_value_null_ok('security_images','si_code',array('si_session_id'=>get_session_id()));
 		if (get_value('captcha_single_guess')==='1')
 		{
-			$GLOBALS['SITE_DB']->query_delete('security_images',array('si_session_id'=>get_session_id())); // Only allowed to check once
+			if (!running_script('snippet'))
+			{
+				$GLOBALS['SITE_DB']->query_delete('security_images',array('si_session_id'=>get_session_id())); // Only allowed to check once
+			}
 		}
 		if (is_null($_code_needed))
 		{

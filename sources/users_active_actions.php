@@ -186,7 +186,7 @@ function handle_active_login($username)
 	} else
 	{
 		$GLOBALS['SITE_DB']->query_insert('failedlogins',array(
-			'failed_account'=>substr(trim(post_param('login_username')),0,255),
+			'failed_account'=>substr(trim(post_param('login_username')),0,80),
 			'date_and_time'=>time(),
 			'ip'=>get_ip_address(),
 		));
@@ -261,7 +261,7 @@ function delete_session($session)
  */
 function ocp_setcookie($name,$value,$session=false,$http_only=false)
 {
-	if (($GLOBALS['DEV_MODE']) && (!running_script('occle')) && (get_forum_type()=='ocf') && (get_param_integer('keep_debug_has_cookies',0)==0)) return true;
+	if (($GLOBALS['DEV_MODE']) && (!running_script('occle')) && (get_forum_type()=='ocf') && (get_param_integer('keep_debug_has_cookies',0)==0) && ($name!='has_referers')) return true;
 
 	$cookie_domain=get_cookie_domain();
 	$path=get_cookie_path();

@@ -13,7 +13,7 @@
 		<div class="edited" role="note">
 			<img alt="" src="{$IMG*,edited}" />
 			{!EDITED}
-			<time datetime="{$FROM_TIMESTAMP*,Y-m-d\TH:i:s\Z,{EDIT_DATE_RAW}}" pubdate="pubdate">{$DATE*,,,,{EDIT_DATE_RAW}}</time>
+			<time datetime="{$FROM_TIMESTAMP*,Y-m-d\TH:i:s\Z,{EDIT_DATE_RAW}}" itemprop="datePublished">{$DATE*,,,,{EDIT_DATE_RAW}}</time>
 		</div>
 	{+END}{+END}
 
@@ -39,7 +39,7 @@
 			{+END}
 		{+END}
 
-		{+START,IF,{$NOT,{IS_PANEL}}}
+		{+START,IF,{$NOR,{IS_PANEL},{$GET,no_comcode_page_edit_links}}}
 			{+START,INCLUDE,STAFF_ACTIONS}
 				1_URL={EDIT_URL*}
 				1_TITLE={$?,{BEING_INCLUDED},&uarr; {!EDIT},{!EDIT_PAGE}}

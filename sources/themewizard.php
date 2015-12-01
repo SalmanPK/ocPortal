@@ -83,7 +83,7 @@ function load_themewizard_params_from_theme($theme,$guess_images_if_needed=false
 				if (!file_exists($css_path))
 					$css_path=get_custom_file_base().'/themes/default/css_custom/'.$sheet;
 				if (!file_exists($css_path))
-					$css_path=get_custom_file_base().'/themes/default/css/'.$sheet;
+					$css_path=get_file_base().'/themes/default/css/'.$sheet;
 				$css_file=file_get_contents($css_path);
 				$matches=array();
 				$num_matches=preg_match_all('#\{\$IMG[;\#]?,([\w\_\-\d]+)\}#',$css_file,$matches);
@@ -106,6 +106,8 @@ function load_themewizard_params_from_theme($theme,$guess_images_if_needed=false
 	global $THEME_WIZARD_IMAGES,$THEME_WIZARD_IMAGES_NO_WILD;
 	$THEME_WIZARD_IMAGES=explode(',',$map['theme_wizard_images']);
 	$THEME_WIZARD_IMAGES_NO_WILD=explode(',',$map['theme_wizard_images_no_wild']);
+
+	// Remove gifs if we do not support them
 	if (!function_exists('imagecreatefromgif'))
 	{
 		global $IMG_CODES;
@@ -447,7 +449,7 @@ function make_theme($themename,$source_theme,$algorithm,$seed,$use,$dark=false,$
 				if (substr($expression,-1)=='*')
 				{
 					$expression=substr($expression,0,strlen($expression)-2); // remove "/*"
-					$full_img_set=array_merge($full_img_set,array_keys(get_all_image_codes(get_file_base().'/'.filter_naughty($source_theme).'/default/images',$expression)));
+					$full_img_set=array_merge($full_img_set,array_keys(get_all_image_codes(get_file_base().'/themes/'.filter_naughty($source_theme).'/images',$expression)));
 					$full_img_set=array_merge($full_img_set,array_keys(get_all_image_codes(get_file_base().'/themes/'.filter_naughty($source_theme).'/images/'.fallback_lang(),$expression)));
 				} else
 				{
@@ -613,10 +615,10 @@ function themewizard_script()
 	}
 	if ($type=='css')
 	{
-		@ini_set('ocproducts.xss_detect','0');
+		safe_ini_set('ocproducts.xss_detect','0');
 		list($colours,$landscape)=calculate_theme($seed,$source_theme,$algorithm,'colours',$dark);
 		$css=theme_wizard_colours_to_sheet($show,$landscape,$source_theme,$algorithm,$seed);
-		header('Content-type: text/css');
+		header('Content-type: text/css; charset='.get_charset());
 		require_code('tempcode_compiler');
 		$tpl=template_to_tempcode($css);
 		$tpl->evaluate_echo();

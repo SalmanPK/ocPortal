@@ -48,7 +48,7 @@ class Module_admin_ocf_join
 	 */
 	function get_entry_points()
 	{
-		return array('menu'=>'MEMBERS','misc'=>'ADD_MEMBER','delurk'=>'DELETE_LURKERS','download_csv'=>'DOWNLOAD_MEMBER_CSV','import_csv'=>'IMPORT_MEMBER_CSV','group_member_timeouts'=>'GROUP_MEMBER_TIMEOUTS');
+		return (get_forum_type()!='ocf')?array():array('menu'=>'MEMBERS','misc'=>'ADD_MEMBER','delurk'=>'DELETE_LURKERS','download_csv'=>'DOWNLOAD_MEMBER_CSV','import_csv'=>'IMPORT_MEMBER_CSV','group_member_timeouts'=>'GROUP_MEMBER_TIMEOUTS');
 	}
 
 	/**
@@ -577,12 +577,12 @@ class Module_admin_ocf_join
 
 		if (function_exists('set_time_limit')) @set_time_limit(0);
 
-		header('Content-type: text/csv');
+		header('Content-type: text/csv; charset='.get_charset());
 		header('Content-Disposition: attachment; filename="'.str_replace(chr(13),'',str_replace(chr(10),'',addslashes($filename))).'"');
 
 		if (ocp_srv('REQUEST_METHOD')=='HEAD') exit();
 
-		@ini_set('ocproducts.xss_detect','0');
+		safe_ini_set('ocproducts.xss_detect','0');
 
 		$fields=array('id','m_username','m_email_address','m_last_visit_time','m_cache_num_posts','m_pass_hash_salted','m_pass_salt','m_password_compat_scheme','m_signature','m_validated','m_join_time','m_primary_group','m_is_perm_banned','m_dob_day','m_dob_month','m_dob_year','m_reveal_age','m_language','m_allow_emails','m_allow_emails_from_staff','m_notes');
 		if (addon_installed('ocf_member_avatars')) $fields[]='m_avatar_url';
@@ -725,6 +725,7 @@ class Module_admin_ocf_join
 						break;
 
 					default: // string
+						if (!isset($m[$part])) continue;
 						$at=$m[$part];
 						break;
 				}
@@ -846,7 +847,7 @@ class Module_admin_ocf_join
 				}
 			}
 
-			@ini_set('auto_detect_line_endings','1');
+			safe_ini_set('auto_detect_line_endings','1');
 			$myfile=fopen($_FILES['file']['tmp_name'],'rt');
 			$del=',';
 			$csv_header=fgetcsv($myfile,102400,$del);
@@ -914,6 +915,8 @@ class Module_admin_ocf_join
 
 						// Put it together
 						$line['Username']=ucfirst($_forename).ucfirst($_surname).$year;
+
+						if ($line['Username']=='') continue;
 					} else
 					{
 						continue; // This field is needed
@@ -966,7 +969,7 @@ class Module_admin_ocf_join
 				if (array_key_exists($email_address_key,$line)) $email_address=$line[$email_address_key]; else $email_address=NULL;
 				if (preg_match('#^([^\s]*)\s+\(.*\)$#',$email_address,$matches)!=0) $email_address=$matches[1];
 				if (preg_match('#^.*\s+<(.*)>$#',$email_address,$matches)!=0) $email_address=$matches[1];
-				if (array_key_exists($dob_key,$line))
+				if ((array_key_exists($dob_key,$line)) && ($line[$dob_key]!=''))
 				{
 					$parts=explode('/',$line[$dob_key]);
 					$dob_day=array_key_exists(2,$parts)?intval($parts[2]):NULL;
@@ -1005,7 +1008,7 @@ class Module_admin_ocf_join
 
 				$avatar_url=array_key_exists('Avatar',$line)?$line['Avatar']:NULL;
 				if (!is_null($avatar_url))
-					if (substr($avatar_url,0,strlen(get_base_url()))==get_base_url()) $avatar_url=substr($avatar_url,strlen(get_base_url()));
+					if (substr($avatar_url,0,strlen(get_base_url().'/'))==get_base_url().'/') $avatar_url=substr($avatar_url,strlen(get_base_url().'/'));
 				$signature=array_key_exists('Signature',$line)?$line['Signature']:'';
 				$is_perm_banned=array_key_exists('Banned',$line)?((strtoupper($line['Banned'])=='YES' || $line['Banned']=='1' || strtoupper($line['Banned'])=='Y' || strtoupper($line['Banned'])=='ON')?1:0):0;
 				$reveal_age=array_key_exists('Reveal age',$line)?((strtoupper($line['Reveal age'])=='YES' || $line['Reveal age']=='1' || strtoupper($line['Reveal age'])=='Y' || strtoupper($line['Reveal age'])=='ON')?1:0):0;
@@ -1019,6 +1022,7 @@ class Module_admin_ocf_join
 					$parts=explode('/',$line['Usergroup']);
 					foreach ($parts as $p)
 					{
+						$p=trim($p);
 						if (!array_key_exists($p,$all_groups))
 						{
 							require_code('ocf_groups_action');
@@ -1117,6 +1121,8 @@ class Module_admin_ocf_join
 					if (is_null($password_compatibility_scheme)) $password_compatibility_scheme='';
 
 					$linked_id=ocf_make_member($username,$password,is_null($email_address)?'':$email_address,$groups,$dob_day,$dob_month,$dob_year,$custom_fields,NULL,$primary_group,$validated,$join_time,NULL,'',$avatar_url,$signature,$is_perm_banned,(get_option('default_preview_guests')=='1')?1:0,$reveal_age,'',$photo_url,$photo_thumb_url,1,1,$language,$allow_emails,$allow_emails_from_staff,'',NULL,'',false,$password_compatibility_scheme,$salt,1,NULL,NULL,0,'*','');
+					$all_members[$linked_id]=$username;
+					$all_members_flipped[$username]=$linked_id;
 					$num_added++;
 				} else
 				{

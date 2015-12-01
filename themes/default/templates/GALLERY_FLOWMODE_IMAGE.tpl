@@ -23,10 +23,19 @@
 					{+END}
 
 					<tbody>
+						{+START,IF_NON_EMPTY,{_TITLE}}
+							<tr>
+								<th class="de_th meta_data_title">{!TITLE}</th>
+								<td>
+									{_TITLE*}
+								</td>
+							</tr>
+						{+END}
+
 						<tr>
 							<th class="de_th meta_data_title">{!ADDED}</th>
 							<td>
-								<time datetime="{$FROM_TIMESTAMP*,Y-m-d\TH:i:s\Z,{ADD_DATE_RAW}}" pubdate="pubdate" itemprop="datePublished">{$DATE_AND_TIME*,1,0,0,{ADD_DATE_RAW}}</time>
+								<time datetime="{$FROM_TIMESTAMP*,Y-m-d\TH:i:s\Z,{ADD_DATE_RAW}}" itemprop="datePublished">{$DATE_AND_TIME*,1,0,0,{ADD_DATE_RAW}}</time>
 							</td>
 						</tr>
 

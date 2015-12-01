@@ -275,7 +275,7 @@ class Module_cms_calendar extends standard_aed_module
 			$time_raw=mktime($row['e_start_hour'],$row['e_start_minute'],0,$row['e_start_month'],$start_day_of_month,$row['e_start_year']);
 			$date=get_timezoned_date($time_raw,!is_null($row['e_start_hour']));
 
-			$fields->attach(results_entry(array(protect_from_escaping(hyperlink(build_url(array('page'=>'calendar','type'=>'view','id'=>$row['id']),get_module_zone('calendar')),get_translated_text($row['e_title']))),$date,$type,($row['validated']==1)?do_lang_tempcode('YES'):do_lang_tempcode('NO'),protect_from_escaping(hyperlink($edit_link,do_lang_tempcode('EDIT'),false,true,'#'.strval($row['id']))))),true);
+			$fields->attach(results_entry(array(protect_from_escaping(hyperlink(build_url(array('page'=>'calendar','type'=>'view','id'=>$row['id']),get_module_zone('calendar')),get_translated_text($row['e_title']),false,true)),$date,$type,($row['validated']==1)?do_lang_tempcode('YES'):do_lang_tempcode('NO'),protect_from_escaping(hyperlink($edit_link,do_lang_tempcode('EDIT'),false,true,'#'.strval($row['id'])))),true));
 		}
 
 		$search_url=build_url(array('page'=>'search','id'=>'calendar'),get_module_zone('search'));
@@ -797,16 +797,17 @@ class Module_cms_calendar extends standard_aed_module
 		{
 			if ((has_actual_page_access($GLOBALS['FORUM_DRIVER']->get_guest_id(),'calendar')) && (has_category_access($GLOBALS['FORUM_DRIVER']->get_guest_id(),'calendar',strval($type))))
 			{
-				$_from=cal_get_start_utctime_for_event($timezone,$start_year,$start_month,$start_day,$start_monthly_spec_type,$start_hour,$start_minute,true);
+				$_from=cal_get_start_utctime_for_event($timezone,$start_year,$start_month,$start_day,$start_monthly_spec_type,$start_hour,$start_minute,false);
 				$from=cal_utctime_to_usertime($_from,$timezone,false);
 				$to=mixed();
 				if (!is_null($end_year) && !is_null($end_month) && !is_null($end_day))
 				{
-					$_to=cal_get_end_utctime_for_event($timezone,$end_year,$end_month,$end_day,$end_monthly_spec_type,$end_hour,$end_minute,true);
+					$_to=cal_get_end_utctime_for_event($timezone,$end_year,$end_month,$end_day,$end_monthly_spec_type,$end_hour,$end_minute,false);
 					$to=cal_utctime_to_usertime($_to,$timezone,false);
 				}
-
-				syndicate_described_activity('calendar:ACTIVITY_CALENDAR_EVENT',$title,date_range($from,$to,!is_null($start_hour)),'','_SEARCH:calendar:view:'.strval($id),'','','calendar',1,NULL,true);
+				$date_range=date_range($from,$to,!is_null($start_hour),make_nice_timezone_name($timezone));
+				if ($recurrence!='') $date_range=do_lang('DOES_RECUR',$date_range);
+				syndicate_described_activity('calendar:ACTIVITY_CALENDAR_EVENT',$title,$date_range,'','_SEARCH:calendar:view:'.strval($id),'','','calendar',1,NULL,true);
 			}
 		}
 
@@ -833,7 +834,95 @@ class Module_cms_calendar extends standard_aed_module
 		$delete_status=post_param('delete','0');
 
 		list($type,$recurrence,$_recurrences,$title,$content,$priority,$is_public,$_start_year,$_start_month,$_start_day,$start_monthly_spec_type,$_start_hour,$_start_minute,$_end_year,$_end_month,$_end_day,$end_monthly_spec_type,$_end_hour,$_end_minute,$timezone,$do_timezone_conv)=$this->get_event_parameters();
-		if ($delete_status!='3')
+
+		$allow_trackbacks=post_param_integer('allow_trackbacks',fractional_edit()?INTEGER_MAGIC_NULL:0);
+		$allow_rating=post_param_integer('allow_rating',fractional_edit()?INTEGER_MAGIC_NULL:0);
+		$allow_comments=post_param_integer('allow_comments',fractional_edit()?INTEGER_MAGIC_NULL:0);
+		$notes=post_param('notes',STRING_MAGIC_NULL);
+		$validated=post_param_integer('validated',fractional_edit()?INTEGER_MAGIC_NULL:0);
+		$seg_recurrences=post_param_integer('seg_recurrences',fractional_edit()?INTEGER_MAGIC_NULL:0);
+
+		$fixed_past=false;
+
+		// Fixing past occurences
+		if (($delete_status=='3') && (!fractional_edit()))
+		{
+			// Fix past occurences
+			$past_times=find_periods_recurrence($event['e_timezone'],1,$event['e_start_year'],$event['e_start_month'],$event['e_start_day'],$event['e_start_monthly_spec_type'],$event['e_start_hour'],$event['e_start_minute'],$event['e_end_year'],$event['e_end_month'],$event['e_end_day'],$event['e_end_monthly_spec_type'],$event['e_end_hour'],$event['e_end_minute'],$event['e_recurrence'],$event['e_recurrences'],utctime_to_usertime(mktime($event['e_start_hour'],$event['e_start_minute'],0,$event['e_start_month'],$event['e_start_day'],$event['e_start_year'])),utctime_to_usertime(time()));
+			if (count($past_times)>0)
+			{
+				foreach ($past_times as $past_time)
+				{
+					list($start_year,$start_month,$start_day,$start_hour,$start_minute)=explode('-',date('Y-m-d-h-i',usertime_to_utctime($past_time[0])));
+					if (is_null($event['e_end_day']))
+					{
+						list($end_year,$end_month,$end_day,$end_hour,$end_minute)=array(NULL,NULL,NULL,NULL,NULL);
+					} else
+					{
+						$explode=explode('-',date('Y-m-d-h-i',usertime_to_utctime($past_time[1])));
+						$end_year=intval($explode[0]);
+						$end_month=intval($explode[1]);
+						$end_day=intval($explode[2]);
+						$end_hour=intval($explode[3]);
+						$end_minute=intval($explode[4]);
+					}
+					add_calendar_event($event['e_type'],'none',NULL,0,get_translated_text($event['e_title']),get_translated_text($event['e_content']),$event['e_priority'],$event['e_is_public'],intval($start_year),intval($start_month),intval($start_day),'day_of_month',intval($start_hour),intval($start_minute),$end_year,$end_month,$end_day,'day_of_month',$end_hour,$end_minute,$timezone,$do_timezone_conv,$validated,$allow_rating,$allow_comments,$allow_trackbacks,$notes);
+				}
+				if (is_null($_recurrences))
+				{
+					$recurrences=NULL;
+				} else
+				{
+					$recurrences=max(0,$_recurrences-count($past_times));
+				}
+
+				// Find next occurence in future
+				if (count($past_times)==0)
+				{
+					$start_year=$_start_year;
+					$start_month=$_start_month;
+					$start_day=$_start_day;
+					$start_hour=$_start_hour;
+					$start_minute=$_start_minute;
+					$end_year=$_end_year;
+					$end_month=$_end_month;
+					$end_day=$_end_day;
+					$end_hour=$_end_hour;
+					$end_minute=$_end_minute;
+				}
+				$past_times=find_periods_recurrence($event['e_timezone'],1,$start_year,$start_month,$start_day,$start_monthly_spec_type,$start_hour,$start_minute,$end_year,$end_month,$end_day,$end_monthly_spec_type,$end_hour,$end_minute,$event['e_recurrence'],usertime_to_utctime($past_times[0][0]+1));
+				if (array_key_exists(0,$past_times))
+				{
+					$past_time=$past_times[0];
+					$explode=explode('-',date('Y-m-d-h-i',$past_time[0]));
+					$start_year=intval($explode[0]);
+					$start_month=intval($explode[1]);
+					$start_day=intval($explode[2]);
+					$start_hour=intval($explode[3]);
+					$start_minute=intval($explode[4]);
+
+					if (is_null($event['e_end_day']))
+					{
+						list($end_year,$end_month,$end_day,$end_hour,$end_minute)=array(NULL,NULL,NULL,NULL,NULL);
+					} else
+					{
+						$explode=explode('-',date('Y-m-d-h-i',$past_time[1]));
+						$end_year=intval($explode[0]);
+						$end_month=intval($explode[1]);
+						$end_day=intval($explode[2]);
+						$end_hour=intval($explode[3]);
+						$end_minute=intval($explode[4]);
+					}
+				} else
+				{
+					$recurrences=0;
+				}
+
+				$fixed_past=true;
+			}
+		}
+
+		if (!$fixed_past)
 		{
 			$start_year=$_start_year;
 			$start_month=$_start_month;
@@ -849,101 +938,24 @@ class Module_cms_calendar extends standard_aed_module
 			$recurrences=$_recurrences;
 		}
 
-		$allow_trackbacks=post_param_integer('allow_trackbacks',fractional_edit()?INTEGER_MAGIC_NULL:0);
-		$allow_rating=post_param_integer('allow_rating',fractional_edit()?INTEGER_MAGIC_NULL:0);
-		$allow_comments=post_param_integer('allow_comments',fractional_edit()?INTEGER_MAGIC_NULL:0);
-		$notes=post_param('notes',STRING_MAGIC_NULL);
-		$validated=post_param_integer('validated',fractional_edit()?INTEGER_MAGIC_NULL:0);
-		$seg_recurrences=post_param_integer('seg_recurrences',fractional_edit()?INTEGER_MAGIC_NULL:0);
-
-		if (($delete_status=='3') && (!fractional_edit()))
-		{
-			// Fix past occurences
-			$past_times=find_periods_recurrence($event['e_timezone'],1,$event['e_start_year'],$event['e_start_month'],$event['e_start_day'],$event['e_start_monthly_spec_type'],$event['e_start_hour'],$event['e_start_minute'],$event['e_end_year'],$event['e_end_month'],$event['e_end_day'],$event['e_end_monthly_spec_type'],$event['e_end_hour'],$event['e_end_minute'],$event['e_recurrence'],$event['e_recurrences'],utctime_to_usertime(mktime($event['e_start_hour'],$event['e_start_minute'],0,$event['e_start_month'],$event['e_start_day'],$event['e_start_year'])),utctime_to_usertime(time()));
-			foreach ($past_times as $past_time)
-			{
-				list($start_year,$start_month,$start_day,$start_hour,$start_minute)=explode('-',date('Y-m-d-h-i',usertime_to_utctime($past_time[0])));
-				if (is_null($past_time[1]))
-				{
-					list($end_year,$end_month,$end_day,$end_hour,$end_minute)=array(NULL,NULL,NULL,NULL,NULL);
-				} else
-				{
-					$explode=explode('-',date('Y-m-d-h-i',usertime_to_utctime($past_time[1])));
-					$end_year=intval($explode[0]);
-					$end_month=intval($explode[1]);
-					$end_day=intval($explode[2]);
-					$end_hour=intval($explode[3]);
-					$end_minute=intval($explode[4]);
-				}
-				add_calendar_event($event['e_type'],'none',NULL,0,get_translated_text($event['e_title']),get_translated_text($event['e_content']),$event['e_priority'],$event['e_is_public'],intval($start_year),intval($start_month),intval($start_day),'day_of_month',intval($start_hour),intval($start_minute),$end_year,$end_month,$end_day,'day_of_month',$end_hour,$end_minute,$timezone,$do_timezone_conv,$validated,$allow_rating,$allow_comments,$allow_trackbacks,$notes);
-			}
-			if (is_null($_recurrences))
-			{
-				$recurrences=NULL;
-			} else
-			{
-				$recurrences=max(0,$_recurrences-count($past_times));
-			}
-
-			// Find next occurence in future
-			if (count($past_times)==0)
-			{
-				$start_year=$_start_year;
-				$start_month=$_start_month;
-				$start_day=$_start_day;
-				$start_hour=$_start_hour;
-				$start_minute=$_start_minute;
-				$end_year=$_end_year;
-				$end_month=$_end_month;
-				$end_day=$_end_day;
-				$end_hour=$_end_hour;
-				$end_minute=$_end_minute;
-			}
-			$past_times=find_periods_recurrence($event['e_timezone'],1,$start_year,$start_month,$start_day,$start_monthly_spec_type,$start_hour,$start_minute,$end_year,$end_month,$end_day,$end_monthly_spec_type,$end_hour,$end_minute,$event['e_recurrence'],1,time());
-			if (array_key_exists(0,$past_times))
-			{
-				$past_time=$past_times[0];
-				$explode=explode('-',date('Y-m-d-h-i',$past_time[0]));
-				$start_year=intval($explode[0]);
-				$start_month=intval($explode[1]);
-				$start_day=intval($explode[2]);
-				$start_hour=intval($explode[3]);
-				$start_minute=intval($explode[4]);
-
-				if (is_null($past_time[1]))
-				{
-					list($end_year,$end_month,$end_day,$end_hour,$end_minute)=array(NULL,NULL,NULL,NULL,NULL);
-				} else
-				{
-					$explode=explode('-',date('Y-m-d-h-i',$past_time[1]));
-					$end_year=intval($explode[0]);
-					$end_month=intval($explode[1]);
-					$end_day=intval($explode[2]);
-					$end_hour=intval($explode[3]);
-					$end_minute=intval($explode[4]);
-				}
-			} else
-			{
-				$recurrences=0;
-			}
-		}
-
 		if (($validated==1) && ($GLOBALS['SITE_DB']->query_value('calendar_events','validated',array('id'=>$id))==0)) // Just became validated, syndicate as just added
 		{
 			if ((has_actual_page_access($GLOBALS['FORUM_DRIVER']->get_guest_id(),'calendar')) && (has_category_access($GLOBALS['FORUM_DRIVER']->get_guest_id(),'calendar',strval($type))))
 			{
-				$_from=cal_get_start_utctime_for_event($timezone,$start_year,$start_month,$start_day,$start_monthly_spec_type,$start_hour,$start_minute,true);
+				$_from=cal_get_start_utctime_for_event($timezone,$start_year,$start_month,$start_day,$start_monthly_spec_type,$start_hour,$start_minute,false);
 				$from=cal_utctime_to_usertime($_from,$timezone,false);
 				$to=mixed();
 				if (!is_null($end_year) && !is_null($end_month) && !is_null($end_day))
 				{
-					$_to=cal_get_end_utctime_for_event($timezone,$end_year,$end_month,$end_day,$end_monthly_spec_type,$end_hour,$end_minute,true);
+					$_to=cal_get_end_utctime_for_event($timezone,$end_year,$end_month,$end_day,$end_monthly_spec_type,$end_hour,$end_minute,false);
 					$to=cal_utctime_to_usertime($_to,$timezone,false);
 				}
 
-				$submitter=$GLOBALS['SITE_DB']->query_value('calendar_events','submitter',array('id'=>$id));
+				$submitter=$GLOBALS['SITE_DB']->query_value('calendar_events','e_submitter',array('id'=>$id));
 
-				syndicate_described_activity(($submitter!=get_member())?'calendar:ACTIVITY_VALIDATE_CALENDAR_EVENT':'calendar:ACTIVITY_CALENDAR_EVENT',$title,date_range($from,$to,!is_null($start_hour)),'','_SEARCH:calendar:view:'.strval($id),'','','calendar',1,NULL/*$submitter*/,true);
+				$date_range=date_range($from,$to,!is_null($start_hour),make_nice_timezone_name($timezone));
+				if ($recurrence!='') $date_range=do_lang('DOES_RECUR',$date_range);
+				syndicate_described_activity(($submitter!=get_member())?'calendar:ACTIVITY_VALIDATE_CALENDAR_EVENT':'calendar:ACTIVITY_CALENDAR_EVENT',$title,$date_range,'','_SEARCH:calendar:view:'.strval($id),'','','calendar',1,NULL/*$submitter*/,true);
 			}
 		}
 
@@ -1190,7 +1202,7 @@ class Module_cms_calendar_cat extends standard_aed_module
 
 			$total=$GLOBALS['SITE_DB']->query_value('calendar_events','COUNT(*)',array('e_type'=>$row['id']));
 
-			$fields->attach(results_entry(array(get_translated_text($row['t_title']),integer_format($total),protect_from_escaping(hyperlink($edit_link,do_lang_tempcode('EDIT'),false,true,'#'.strval($row['id']))))),true);
+			$fields->attach(results_entry(array(get_translated_text($row['t_title']),integer_format($total),protect_from_escaping(hyperlink($edit_link,do_lang_tempcode('EDIT'),false,true,'#'.strval($row['id'])))),true));
 		}
 
 		$search_url=NULL;

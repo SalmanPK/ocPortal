@@ -71,9 +71,6 @@ class Module_cedi
 
 		$GLOBALS['SITE_DB']->drop_if_exists('seedy_posts');
 
-		delete_attachments('seedy_post');
-		delete_attachments('cedi_post');
-
 		delete_menu_item_simple('_SEARCH:cedi:type=misc');
 		delete_menu_item_simple('_SEARCH:cedi:type=random');
 		delete_menu_item_simple('_SEARCH:cedi:type=changes');
@@ -373,13 +370,19 @@ class Module_cedi
 		attach_message(do_lang_tempcode('TAKEN_RANDOM_WIKI_PAGE'),'inform');
 
 		$num_pages=$GLOBALS['SITE_DB']->query_value('seedy_pages','MAX(id)');
-		$pages=array();
-		do // Loop. picking random pages between 0 and max-id till we find one that exists
+		if ($num_pages<=db_get_first_id())
 		{
-			$id=mt_rand(db_get_first_id(),$num_pages);
-			$pages=$GLOBALS['SITE_DB']->query_select('seedy_pages',array('*'),array('id'=>$id),'',1);
+			$id=$num_pages;
+		} else
+		{
+			$pages=array();
+			do // Loop. picking random pages between 0 and max-id till we find one that exists
+			{
+				$id=mt_rand(db_get_first_id(),$num_pages);
+				$pages=$GLOBALS['SITE_DB']->query_select('seedy_pages',array('*'),array('id'=>$id),'',1);
+			}
+			while (!array_key_exists(0,$pages));
 		}
-		while (!array_key_exists(0,$pages));
 		$redir_url=build_url(array('page'=>'_SELF','type'=>'misc','id'=>$id),'_SELF');
 		return redirect_screen(get_screen_title('RANDOM_PAGE'),$redir_url,'');
 	}
@@ -545,7 +548,7 @@ class Module_cedi
 			'publisher'=>'', // blank means same as creator
 			'modified'=>'',
 			'type'=>'Wiki+ Page',
-			'title'=>get_translated_text($page['title']),
+			'title'=>comcode_escape(get_translated_text($page['title'])),
 			'identifier'=>'_SEARCH:cedi:misc:'.strval($page['id']),
 			'description'=>get_translated_text($page['description']),
 			'numposts'=>strval($num_posts),

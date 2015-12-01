@@ -20,6 +20,7 @@
 
 /**
  * Add to the newsletter, in the simplest way.
+ * No authorisation support here, checks it works only for non-subscribed or non-confirmed members.
  *
  * @param  EMAIL				The email address of the subscriber
  * @param  integer			The interest level
@@ -33,46 +34,49 @@
  */
 function basic_newsletter_join($email,$interest_level=4,$lang=NULL,$get_confirm_mail=false,$newsletter_id=NULL,$forename='',$surname='')
 {
+	require_lang('newsletter');
+
 	if (is_null($lang)) $lang=user_lang();
 	if (is_null($newsletter_id)) $newsletter_id=db_get_first_id();
 
-	$password=get_rand_password();
-	$code_confirm=$get_confirm_mail?mt_rand(1,9999999):0;
-	$test=$GLOBALS['SITE_DB']->query_value_null_ok('newsletter_subscribe','the_level',array('newsletter_id'=>$newsletter_id,'email'=>$email));
-	if ($test===0)
+	$code_confirm=$GLOBALS['SITE_DB']->query_value_null_ok('newsletter','code_confirm',array('email'=>$email));
+	if (is_null($code_confirm))
 	{
-		$GLOBALS['SITE_DB']->query_delete('newsletter_subscribe',array('newsletter_id'=>$newsletter_id,'email'=>$email),'',1);
-		$test=NULL;
-	}
-	if (is_null($test))
+		// New, set their details
+		$password=get_rand_password();
+		$salt=produce_salt();
+		$code_confirm=$get_confirm_mail?mt_rand(1,9999999):0;
+		$GLOBALS['SITE_DB']->query_insert('newsletter',array('n_forename'=>$forename,'n_surname'=>$surname,'join_time'=>time(),'email'=>$email,'code_confirm'=>$code_confirm,'pass_salt'=>$salt,'the_password'=>md5($password.$salt),'language'=>$lang),false,true); // race condition
+	} else
 	{
-		require_lang('newsletter');
-
-		$test=$GLOBALS['SITE_DB']->query_value_null_ok('newsletter','email',array('email'=>$email));
-		if (is_null($test))
+		if ($code_confirm>0)
 		{
-			$salt=produce_salt();
-			$GLOBALS['SITE_DB']->query_insert('newsletter',array('n_forename'=>$forename,'n_surname'=>$surname,'join_time'=>time(),'email'=>$email,'code_confirm'=>$code_confirm,'pass_salt'=>$salt,'the_password'=>md5($password.$salt),'language'=>$lang),false,true); // race condition
-
-			if ($get_confirm_mail)
-			{
-				$_url=build_url(array('page'=>'newsletter','type'=>'confirm','email'=>$email,'confirm'=>$code_confirm),get_module_zone('newsletter'));
-				$url=$_url->evaluate();
-				$message=do_lang('NEWSLETTER_SIGNUP_TEXT',comcode_escape($url),comcode_escape($password),array($forename,$surname,$email,get_site_name()),$lang);
-				require_code('mail');
-				mail_wrap(do_lang('NEWSLETTER_SIGNUP',NULL,NULL,NULL,$lang),$message,array($email),NULL,'','',3,NULL,false,NULL,false,false,false,'MAIL',true);
-			}
+			// Was not confirmed, allow confirm mail to go again as if this was new, and update their details
+			$GLOBALS['SITE_DB']->query_update('newsletter',array('n_forename'=>$forename,'n_surname'=>$surname,'join_time'=>time(),'language'=>$lang),array('email'=>$email),'',1);
+			$password=do_lang('NEWSLETTER_PASSWORD_ENCRYPTED');
 		} else
 		{
-			$GLOBALS['SITE_DB']->query_update('newsletter',array('join_time'=>time()),array('email'=>$email),'',1);
-			$password='';
+			// Already on newsletter and confirmed so don't allow tampering without authorisation, which this method can't do
+			return do_lang('NA');
 		}
-		$GLOBALS['SITE_DB']->query_insert('newsletter_subscribe',array('newsletter_id'=>$newsletter_id,'the_level'=>$interest_level,'email'=>$email),false,true); // race condition
-
-		return $password;
 	}
 
-	return do_lang('NA');
+	// Send confirm email
+	if ($get_confirm_mail)
+	{
+		$_url=build_url(array('page'=>'newsletter','type'=>'confirm','email'=>$email,'confirm'=>$code_confirm),get_module_zone('newsletter'));
+		$url=$_url->evaluate();
+		$newsletter_url=build_url(array('page'=>'newsletter'),get_module_zone('newsletter'));
+		$message=do_lang('NEWSLETTER_SIGNUP_TEXT',comcode_escape($url),comcode_escape($password),array($forename,$surname,$email,get_site_name(),$newsletter_url->evaluate()),$lang);
+		require_code('mail');
+		mail_wrap(do_lang('NEWSLETTER_SIGNUP',NULL,NULL,NULL,$lang),$message,array($email),NULL,'','',3,NULL,false,NULL,false,false,false,'MAIL',true);
+	}
+
+	// Set subscription
+	$GLOBALS['SITE_DB']->query_delete('newsletter_subscribe',array('newsletter_id'=>$newsletter_id,'email'=>$email),'',1);
+	$GLOBALS['SITE_DB']->query_insert('newsletter_subscribe',array('newsletter_id'=>$newsletter_id,'the_level'=>$interest_level,'email'=>$email),false,true); // race condition
+
+	return $password;
 }
 
 /**
@@ -152,7 +156,7 @@ function newsletter_who_send_to($send_details,$lang,$start,$max,$get_raw_rows=fa
 		if ($this_level!=0)
 		{
 			$where_lang=multi_lang()?(db_string_equal_to('language',$lang).' AND '):'';
-			$query=' FROM '.get_table_prefix().'newsletter_subscribe s LEFT JOIN '.get_table_prefix().'newsletter n ON n.email=s.email WHERE '.$where_lang.'code_confirm=0 AND s.newsletter_id='.strval($newsletter['id']).' AND the_level>='.strval((integer)$this_level);
+			$query=' FROM '.get_table_prefix().'newsletter_subscribe s LEFT JOIN '.get_table_prefix().'newsletter n ON n.email=s.email WHERE '.$where_lang.'code_confirm=0 AND s.newsletter_id='.strval($newsletter['id']).' AND the_level>='.strval((integer)$this_level).' ORDER BY n.id';
 			$temp=$GLOBALS['SITE_DB']->query('SELECT n.id,n.email,the_password,n_forename,n_surname'.$query,$max,$start);
 			if ($start==0)
 			{
@@ -206,7 +210,7 @@ function newsletter_who_send_to($send_details,$lang,$start,$max,$get_raw_rows=fa
 				{
 					$query='SELECT xxxxx FROM '.$GLOBALS['FORUM_DB']->get_table_prefix().'f_members m LEFT JOIN '.$GLOBALS['FORUM_DB']->get_table_prefix().'f_group_members g ON m.id=g.gm_member_id AND g.gm_validated=1 WHERE '.db_string_not_equal_to('m_email_address','').' AND '.$where_lang.'m_validated=1 AND (gm_group_id='.strval($id).' OR m_primary_group='.strval($id).')';
 					if (get_option('allow_email_from_staff_disable')=='1') $query.=' AND m_allow_emails=1';
-					$query.=' AND m_is_perm_banned=0';
+					$query.=' AND m_is_perm_banned=0 ORDER BY m.id';
 				} else
 				{
 					$query='SELECT xxxxx  FROM '.$GLOBALS['FORUM_DB']->get_table_prefix().'f_members m LEFT JOIN '.$GLOBALS['FORUM_DB']->get_table_prefix().'f_group_members g ON m.id=g.gm_member_id AND g.gm_validated=1 WHERE '.db_string_not_equal_to('m_email_address','').' AND '.$where_lang.'m_validated=1 AND gm_group_id='.strval($id);
@@ -214,7 +218,8 @@ function newsletter_who_send_to($send_details,$lang,$start,$max,$get_raw_rows=fa
 					$query.=' AND m_is_perm_banned=0';
 					$query.=' UNION SELECT xxxxx FROM '.$GLOBALS['FORUM_DB']->get_table_prefix().'f_members m WHERE '.db_string_not_equal_to('m_email_address','').' AND '.$where_lang.'m_validated=1 AND m_primary_group='.strval($id);
 					if (get_option('allow_email_from_staff_disable')=='1') $query.=' AND m_allow_emails=1';
-					$query.=' AND m_is_perm_banned=0';
+
+					$query.=' AND m_is_perm_banned=0 ORDER BY id';
 				}
 				$_rows=$GLOBALS['FORUM_DB']->query(str_replace('xxxxx','m.id,m.m_email_address,m.m_username',$query),$max,$start,false,true);
 				if ($start==0)
@@ -246,7 +251,7 @@ function newsletter_who_send_to($send_details,$lang,$start,$max,$get_raw_rows=fa
 		{
 			$query=' FROM '.$GLOBALS['FORUM_DB']->get_table_prefix().'f_members WHERE '.db_string_not_equal_to('m_email_address','').' AND '.$where_lang.'m_validated=1';
 			if (get_option('allow_email_from_staff_disable')=='1') $query.=' AND m_allow_emails=1';
-			$query.=' AND m_is_perm_banned=0';
+			$query.=' AND m_is_perm_banned=0 ORDER BY id';
 			$_rows=$GLOBALS['FORUM_DB']->query('SELECT id,m_email_address,m_username'.$query,$max,$start);
 			if ($start==0)
 				$total['-1']=$GLOBALS['FORUM_DB']->query_value_null_ok_full('SELECT COUNT(*)'.$query);
@@ -386,7 +391,7 @@ function newsletter_block_list()
 	$block_path=get_custom_file_base().'/uploads/website_specific/newsletter_blocked.csv';
 	if (is_file($block_path))
 	{
-		@ini_set('auto_detect_line_endings','1');
+		safe_ini_set('auto_detect_line_endings','1');
 		$myfile=fopen($block_path,'rt');
 		while (($row=fgetcsv($myfile,1024))!==false)
 		{
@@ -462,18 +467,22 @@ function newsletter_shutdown_function()
 
 			if (!is_null($last_cron))
 			{
-				$GLOBALS['SITE_DB']->query_insert('newsletter_drip_send',array(
-					'd_inject_time'=>time(),
-					'd_subject'=>$NEWSLETTER_SUBJECT,
-					'd_message'=>$newsletter_message_substituted,
-					'd_html_only'=>$NEWSLETTER_HTML_ONLY,
-					'd_to_email'=>$email_address,
-					'd_to_name'=>$usernames[$i],
-					'd_from_email'=>$NEWSLETTER_FROM_EMAIL,
-					'd_from_name'=>$NEWSLETTER_FROM_NAME,
-					'd_priority'=>$NEWSLETTER_PRIORITY,
-					'd_template'=>$NEWSLETTER_MAIL_TEMPLATE,
-				));
+				$test=$GLOBALS['SITE_DB']->query_value_null_ok('newsletter_drip_send','d_to_email',array('d_to_email'=>$email_address,'d_subject'=>$NEWSLETTER_SUBJECT));
+				if (is_null($test))
+				{
+					$GLOBALS['SITE_DB']->query_insert('newsletter_drip_send',array(
+						'd_inject_time'=>time(),
+						'd_subject'=>$NEWSLETTER_SUBJECT,
+						'd_message'=>$newsletter_message_substituted,
+						'd_html_only'=>$NEWSLETTER_HTML_ONLY,
+						'd_to_email'=>$email_address,
+						'd_to_name'=>$usernames[$i],
+						'd_from_email'=>$NEWSLETTER_FROM_EMAIL,
+						'd_from_name'=>$NEWSLETTER_FROM_NAME,
+						'd_priority'=>$NEWSLETTER_PRIORITY,
+						'd_template'=>$NEWSLETTER_MAIL_TEMPLATE,
+					));
+				}
 			} else
 			{
 				mail_wrap($NEWSLETTER_SUBJECT,$newsletter_message_substituted,array($email_address),array($usernames[$i]),$NEWSLETTER_FROM_EMAIL,$NEWSLETTER_FROM_NAME,$NEWSLETTER_PRIORITY,NULL,true,NULL,true,$in_html,false,$NEWSLETTER_MAIL_TEMPLATE);

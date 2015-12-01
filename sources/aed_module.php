@@ -280,7 +280,17 @@ class standard_aed_module
 
 		if (is_null($allow_comments))
 		{
-			$val=$GLOBALS['SITE_DB']->query_value_null_ok_full('SELECT allow_comments,count(allow_comments) AS qty FROM '.get_table_prefix().$this->table.' GROUP BY allow_comments ORDER BY qty DESC',1); // We need the mode here, not the mean
+			$query='SELECT allow_comments,count(allow_comments) AS qty FROM '.get_table_prefix().$this->table;
+			if ($this->table=='catalogue_entries')
+			{
+				$catalogue_name=get_param('catalogue_name',NULL);
+				if (!is_null($catalogue_name))
+				{
+					$query.=' WHERE '.db_string_equal_to('c_name',$catalogue_name);
+				}
+			}
+			$query.=' GROUP BY allow_comments ORDER BY qty DESC';
+			$val=$GLOBALS['SITE_DB']->query_value_null_ok_full($query); // We need the mode here, not the mean
 			$allow_comments=is_null($val)?1:$val;
 		}
 
@@ -526,8 +536,7 @@ class standard_aed_module
 		if ($this->has_tied_catalogue())
 		{
 			require_code('fields');
-			$fields->attach(do_template('FORM_SCREEN_FIELD_SPACER',array('TITLE'=>do_lang_tempcode('MORE'))));
-			append_form_custom_fields($this->award_type,NULL,$fields,$hidden);
+			append_form_custom_fields($this->award_type,NULL,$fields,$hidden,true);
 		}
 
 		// SEO?
@@ -1009,8 +1018,7 @@ class standard_aed_module
 		if ($this->has_tied_catalogue())
 		{
 			require_code('fields');
-			$fields->attach(do_template('FORM_SCREEN_FIELD_SPACER',array('TITLE'=>do_lang_tempcode('MORE'))));
-			append_form_custom_fields($this->award_type,$id,$fields,$hidden);
+			append_form_custom_fields($this->award_type,$id,$fields,$hidden,true);
 		}
 
 		// SEO?

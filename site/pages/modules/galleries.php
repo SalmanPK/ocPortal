@@ -682,7 +682,7 @@ class Module_galleries
 			'publisher'=>'', // blank means same as creator
 			'modified'=>'',
 			'type'=>'Gallery',
-			'title'=>$fullname,
+			'title'=>comcode_escape($fullname),
 			'identifier'=>'_SEARCH:galleries:misc:'.$cat,
 			'description'=>get_translated_text($myrow['description']),
 		);
@@ -818,7 +818,7 @@ class Module_galleries
 					$rows=$GLOBALS['SITE_DB']->query_select('videos',array('*'),$map,'',1);
 					if (!array_key_exists(0,$rows))
 					{
-						attach_message(do_lang_tempcode('MISSING_RESOURCE','warn'));
+						attach_message(do_lang_tempcode('MISSING_RESOURCE'),'warn');
 						break;
 					}
 					$row=$rows[0];
@@ -862,7 +862,7 @@ class Module_galleries
 					$rows=$GLOBALS['SITE_DB']->query_select('images',array('*'),$map,'',1);
 					if (!array_key_exists(0,$rows))
 					{
-						attach_message(do_lang_tempcode('MISSING_RESOURCE','warn'));
+						attach_message(do_lang_tempcode('MISSING_RESOURCE'),'warn');
 						break;
 					}
 					$row=$rows[0];
@@ -1129,7 +1129,7 @@ class Module_galleries
 	{
 		$id=get_param_integer('id');
 
-		if (get_param_integer('ajax',0)==1) header('Content-type: text/xml');
+		if (get_param_integer('ajax',0)==1) header('Content-type: text/xml; charset='.get_charset());
 
 		list($sort,$sort_backwards,$sql_suffix_images,$sql_suffix_videos)=$this->get_sort_order();
 
@@ -1259,7 +1259,7 @@ class Module_galleries
 	{
 		$id=get_param_integer('id');
 
-		if (get_param_integer('ajax',0)==1) header('Content-type: text/xml');
+		if (get_param_integer('ajax',0)==1) header('Content-type: text/xml; charset='.get_charset());
 
 		list($sort,$sort_backwards,$sql_suffix_images,$sql_suffix_videos)=$this->get_sort_order();
 

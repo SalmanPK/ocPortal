@@ -24,6 +24,13 @@ Note that this script can't find everything due to dynamicness of ocPortal langu
  */
 class html_safe_lang_test_set extends ocp_test_case
 {
+	function setUp()
+	{
+		parent::setUp();
+
+		disable_php_memory_limit();
+	}
+
 	function testHtmlSafeLang()
 	{
  		if (function_exists('set_time_limit')) @set_time_limit(0);
@@ -104,7 +111,7 @@ class html_safe_lang_test_set extends ocp_test_case
 			'WRITE_ERROR',
 		);
 
-		$result=array_keys(array_intersect_assoc($LANGUAGE_LITERAL,$LANGUAGE_HTML));
+		$result=array_keys(array_intersect_key($LANGUAGE_LITERAL,$LANGUAGE_HTML));
 		$cnt=0;
 		foreach ($result as $r)
 		{
@@ -114,7 +121,7 @@ class html_safe_lang_test_set extends ocp_test_case
 			$a=str_replace(get_file_base().'/','',$_a);
 			$_b=$LANGUAGE_HTML[$r][0];
 			$b=str_replace(get_file_base().'/','',$_b);
-			$this->assertTrue(false,$a.' vs '.$b);
+			$this->assertTrue(false,$r.': '.$a.' vs '.$b);
 			//echo '<p>'.htmlentities($r).' (<a href="txmt://open?url=file://'.htmlentities($_a).'">'.htmlentities($a).'</a> and <a href="txmt://open?url=file://'.htmlentities($_b).'">'.htmlentities($b).')</a></p>';
 
 			$cnt++;

@@ -142,9 +142,10 @@ function update_ticket_type_lead_times()
  * @param  ?AUTO_LINK	The ticket type (NULL: all ticket types)
  * @param  boolean		Don't view others' tickets, even if the member has permission to
  * @param  boolean		Whether to skip showing errors, returning NULL instead
+ * @param  boolean		Whether to include first posts
  * @return array			Array of tickets, empty on failure
  */
-function get_tickets($member,$ticket_type=NULL,$override_view_others_tickets=false,$silent_error_handling=false)
+function get_tickets($member,$ticket_type=NULL,$override_view_others_tickets=false,$silent_error_handling=false,$include_first_posts=false)
 {
 	$restrict='';
 	$restrict_description='';
@@ -193,7 +194,10 @@ function get_tickets($member,$ticket_type=NULL,$override_view_others_tickets=fal
 	foreach ($topics as $topic)
 	{
 		$fp=$topic['firstpost'];
-		unset($topic['firstpost']); // To stop Tempcode randomly making serialization sometimes change such that the refresh_if_changed is triggered
+		if (!$include_first_posts)
+		{
+			unset($topic['firstpost']); // To stop Tempcode randomly making serialization sometimes change such that the refresh_if_changed is triggered
+		}
 		if ((is_null($ticket_type)) || (strpos($fp->evaluate(),do_lang('TICKET_TYPE').': '.get_translated_text($ticket_type))!==false))
 		{
 			$filtered_topics[]=$topic;
@@ -257,7 +261,7 @@ function delete_ticket_by_topic_id($topic_id)
  *
  * @param  AUTO_LINK		The member ID
  * @param  string			The ticket ID (doesn't have to exist)
- * @param  integer		The ticket type
+ * @param  integer		The ticket type (-1 reply to ticket)
  * @param  LONG_TEXT		The post title
  * @param  LONG_TEXT		The post content in Comcode format
  * @param  string			The home URL
@@ -267,7 +271,7 @@ function ticket_add_post($member,$ticket_id,$ticket_type,$title,$post,$ticket_ur
 {
 	// Get the forum ID first
 	$fid=$GLOBALS['SITE_DB']->query_value_null_ok('tickets','forum_id',array('ticket_id'=>$ticket_id));
-	if (is_null($fid)) $fid=get_ticket_forum_id($member,$ticket_type);
+	if (is_null($fid)) $fid=get_ticket_forum_id($member,($ticket_type==-1)?NULL:$ticket_type);
 
 	$GLOBALS['FORUM_DRIVER']->make_post_forum_topic(
 		$fid,

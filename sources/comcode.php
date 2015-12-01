@@ -49,6 +49,11 @@ function init__comcode()
 	global $OVERRIDE_SELF_ZONE;
 	$OVERRIDE_SELF_ZONE=NULL; // This is not pretty, but needed to properly scope links for search results.
 
+	// We're not allowed to specify any of these as entities
+	global $POTENTIAL_JS_NAUGHTY_ARRAY;
+	$POTENTIAL_JS_NAUGHTY_ARRAY=array(/*'v'=>1,*/'b'=>1,/*'V'=>1,*/'B'=>1,'d'=>1,'D'=>1,/*'a'=>1,'t'=>1,'a'=>1,*/'j'=>1,'a'=>1,'v'=>1,'s'=>1,'c'=>1,'r'=>1,'i'=>1,'p'=>1,'t'=>1,'J'=>1,'A'=>1,'V'=>1,'S'=>1,'C'=>1,'R'=>1,'I'=>1,'P'=>1,'T'=>1,' '=>1,"\t"=>1,"\n"=>1,"\r"=>1,':'=>1,'/'=>1,'*'=>1,'\\'=>1);
+	$POTENTIAL_JS_NAUGHTY_ARRAY[chr(0)]=1;
+
 	global $LAX_COMCODE;
 	$LAX_COMCODE=(!function_exists('get_option') || get_option('complex_uploader',true)=='0'); // TODO: This should be a new accessibility option. It is bad to expect blind users to get Comcode precisely right, it's a lot harder when you can't scan visually.
 }
@@ -181,7 +186,7 @@ function comcode_to_tempcode($comcode,$source_member=NULL,$as_admin=false,$wrap_
 		if (!is_string($key)) $key=strval($key);
 		if (preg_match('#^hidFileID\_#i',$key)!=0) $attachments=true;
 	}
-	if ((!$attachments || ($GLOBALS['IN_MINIKERNEL_VERSION']==1)) && (preg_match('#^[\w\d\-\_\(\) \.,:;/"\!\?]*$#'/*NB: No apostophes allowed in here, as they get changed by escape_html and can interfere then with apply_emoticons*/,$comcode)!=0) && (strpos($comcode,'  ')===false) && (strpos($comcode,'://')===false) && (get_page_name()!='search'))
+	if ((!$attachments || ($GLOBALS['IN_MINIKERNEL_VERSION']==1)) && (preg_match('#^[\w\d\-\_\(\) \.,:;/"\!\?]*$#'/*NB: No apostophes allowed in here, as they get changed by escape_html and can interfere then with apply_emoticons*/,$comcode)!=0) && (strpos($comcode,'  ')===false) && (strpos($comcode,'://')===false) && (strpos($comcode,'--')===false) && (get_page_name()!='search'))
 	{
 		if (running_script('stress_test_loader')) return make_string_tempcode(escape_html($comcode));
 		return make_string_tempcode(apply_emoticons(escape_html($comcode)));

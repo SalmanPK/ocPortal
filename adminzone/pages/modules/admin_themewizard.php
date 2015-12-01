@@ -87,7 +87,9 @@ class Module_admin_themewizard
 	 */
 	function step1()
 	{
-		$title=get_screen_title('_THEMEWIZARD',true,array(integer_format(1),integer_format(4)));
+		$title=get_screen_title('_THEMEWIZARD',true,array(escape_html(integer_format(1)),escape_html(integer_format(4))));
+
+		if (!function_exists('imagepng')) warn_exit(do_lang_tempcode('GD_NEEDED'));
 
 		$post_url=build_url(array('page'=>'_SELF','type'=>'step2'),'_SELF',array('keep_theme_seed','keep_theme_dark','keep_theme_source','keep_theme_algorithm'),false,true);
 		$text=do_lang_tempcode('THEMEWIZARD_1_DESCRIBE');
@@ -129,6 +131,7 @@ class Module_admin_themewizard
 		$fields->attach(do_template('FORM_SCREEN_FIELD_SPACER',array('SECTION_HIDDEN'=>true,'TITLE'=>do_lang_tempcode('ADVANCED'))));
 		$fields->attach(form_input_tick(do_lang_tempcode('INHERIT_CSS'),do_lang_tempcode('DESCRIPTION_INHERIT_CSS'),'inherit_css',get_param_integer('inherit_css',0)==1));
 
+		breadcrumb_set_parents(array(array('_SEARCH:admin_themes',do_lang_tempcode('THEMES'))));
 		breadcrumb_set_self(do_lang_tempcode('THEMEWIZARD'));
 
 		require_javascript('javascript_ajax');
@@ -166,7 +169,7 @@ class Module_admin_themewizard
 	 */
 	function step2()
 	{
-		$title=get_screen_title('_THEMEWIZARD',true,array(integer_format(2),integer_format(4)));
+		$title=get_screen_title('_THEMEWIZARD',true,array(escape_html(integer_format(2)),escape_html(integer_format(4))));
 
 		$source_theme=get_param('source_theme');
 		$algorithm=get_param('algorithm');
@@ -174,6 +177,8 @@ class Module_admin_themewizard
 		$dark=get_param_integer('dark',0);
 		$inherit_css=get_param_integer('inherit_css',0);
 		$themename=get_param('themename');
+		require_code('type_validation');
+		if ((!is_alphanumeric($themename,true)) || (strlen($themename)>40)) warn_exit(do_lang_tempcode('BAD_CODENAME'));
 		if ((file_exists(get_custom_file_base().'/themes/'.$themename)) || ($themename=='default'))
 		{
 			warn_exit(do_lang_tempcode('ALREADY_EXISTS',escape_html($themename)));
@@ -198,7 +203,7 @@ class Module_admin_themewizard
 		$theme['CHANGE_URL']=build_url(array('page'=>'_SELF','type'=>'misc','source_theme'=>$source_theme,'algorithm'=>$algorithm,'seed'=>$seed,'dark'=>$dark,'inherit_css'=>$inherit_css,'themename'=>$themename),'_SELF');
 		$theme['STAGE3_URL']=build_url(array('page'=>'_SELF','type'=>'step3','source_theme'=>$source_theme,'algorithm'=>$algorithm,'seed'=>$seed,'dark'=>$dark,'inherit_css'=>$inherit_css,'themename'=>$themename),'_SELF');
 
-		breadcrumb_set_parents(array(array('_SELF:_SELF:misc',do_lang_tempcode('THEMEWIZARD'))));
+		breadcrumb_set_parents(array(array('_SEARCH:admin_themes',do_lang_tempcode('THEMES')),array('_SELF:_SELF:misc',do_lang_tempcode('THEMEWIZARD'))));
 		return do_template('THEMEWIZARD_2_SCREEN',$theme);
 	}
 
@@ -209,7 +214,7 @@ class Module_admin_themewizard
 	 */
 	function step3()
 	{
-		$title=get_screen_title('_THEMEWIZARD',true,array(integer_format(3),integer_format(4)));
+		$title=get_screen_title('_THEMEWIZARD',true,array(escape_html(integer_format(3)),escape_html(integer_format(4))));
 
 		$source_theme=get_param('source_theme');
 		$algorithm=get_param('algorithm');
@@ -231,7 +236,7 @@ class Module_admin_themewizard
 		$hidden->attach(form_input_hidden('dark',strval($dark)));
 		$hidden->attach(form_input_hidden('inherit_css',strval($inherit_css)));
 
-		breadcrumb_set_parents(array(array('_SELF:_SELF:misc',do_lang_tempcode('THEMEWIZARD'))));
+		breadcrumb_set_parents(array(array('_SEARCH:admin_themes',do_lang_tempcode('THEMES')),array('_SELF:_SELF:misc',do_lang_tempcode('THEMEWIZARD'))));
 		return do_template('FORM_SCREEN',array('_GUID'=>'349383d77ecfce8c65f3303cfec86ea0','SKIP_VALIDATION'=>true,'TITLE'=>$title,'TEXT'=>do_lang_tempcode('REFRESH_TO_FINISH'),'FIELDS'=>$fields,'URL'=>$post_url,'SUBMIT_NAME'=>$submit_name,'HIDDEN'=>$hidden));
 	}
 
@@ -251,9 +256,10 @@ class Module_admin_themewizard
 		$dark=post_param_integer('dark');
 		$inherit_css=post_param_integer('inherit_css');
 
+		echo ' '; // HACKHACK: IIS seems to have a weird issue with 'slowish spiky process not continuing with output' - this works around it. Not ideal as would break headers in any hook.
 		if (function_exists('set_time_limit')) @set_time_limit(0);
 
-		breadcrumb_set_parents(array(array('_SELF:_SELF:misc',do_lang_tempcode('THEMEWIZARD'))));
+		breadcrumb_set_parents(array(array('_SEARCH:admin_themes',do_lang_tempcode('THEMES')),array('_SELF:_SELF:misc',do_lang_tempcode('THEMEWIZARD'))));
 
 		require_code('type_validation');
 		if ((!is_alphanumeric($themename,true)) || (strlen($themename)>40)) warn_exit(do_lang_tempcode('BAD_CODENAME'));
@@ -267,7 +273,7 @@ class Module_admin_themewizard
 		sync_file('themes/'.filter_naughty($themename).'/theme.ini');
 
 		// We're done
-		$title=get_screen_title('_THEMEWIZARD',true,array(integer_format(4),integer_format(4)));
+		$title=get_screen_title('_THEMEWIZARD',true,array(escape_html(integer_format(4)),escape_html(integer_format(4))));
 		$message=do_lang_tempcode('THEMEWIZARD_4_DESCRIBE',escape_html('#'.$seed),escape_html($themename));
 
 		require_code('templates_donext');
@@ -310,7 +316,7 @@ class Module_admin_themewizard
 	{
 		if (!function_exists('imagepng')) warn_exit(do_lang_tempcode('GD_NEEDED'));
 
-		$title=get_screen_title('_LOGOWIZARD',true,array(integer_format(1),integer_format(3)));
+		$title=get_screen_title('_LOGOWIZARD',true,array(escape_html(integer_format(1)),escape_html(integer_format(3))));
 		$GLOBALS['HELPER_PANEL_PIC']='pagepics/logowizard';
 
 		$post_url=build_url(array('page'=>'_SELF','type'=>'_make_logo'),'_SELF');
@@ -349,7 +355,7 @@ class Module_admin_themewizard
 	 */
 	function _make_logo()
 	{
-		$title=get_screen_title('_LOGOWIZARD',true,array(integer_format(2),integer_format(3)));
+		$title=get_screen_title('_LOGOWIZARD',true,array(escape_html(integer_format(2)),escape_html(integer_format(3))));
 		$GLOBALS['HELPER_PANEL_PIC']='pagepics/logowizard';
 
 		$preview=do_template('LOGOWIZARD_2',array('NAME'=>post_param('name'),'TITLE'=>post_param('title'),'THEME'=>post_param('theme')));
@@ -367,7 +373,7 @@ class Module_admin_themewizard
 	 */
 	function __make_logo()
 	{
-		$title=get_screen_title('_LOGOWIZARD',true,array(integer_format(3),integer_format(3)));
+		$title=get_screen_title('_LOGOWIZARD',true,array(escape_html(integer_format(3)),escape_html(integer_format(3))));
 		$GLOBALS['HELPER_PANEL_PIC']='pagepics/logowizard';
 
 		$theme=post_param('theme');

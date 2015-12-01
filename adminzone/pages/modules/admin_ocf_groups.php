@@ -151,7 +151,7 @@ class Module_admin_ocf_groups extends standard_aed_module
 	 */
 	function get_form_fields($id=NULL,$name='',$is_default=0,$is_super_admin=0,$is_super_moderator=0,$group_leader='',$title='',$rank_image='',$promotion_target=NULL,$promotion_threshold=NULL,$flood_control_submit_secs=0,$flood_control_access_secs=0,$gift_points_base=25,$gift_points_per_day=1,$max_daily_upload_mb=5,$max_attachments_per_post=20,$max_avatar_width=80,$max_avatar_height=80,$max_post_length_comcode=40000,$max_sig_length_comcode=1000,$enquire_on_new_ips=0,$is_presented_at_install=0,$group_is_hidden=0,$order=NULL,$rank_image_pri_only=1,$open_membership=0,$is_private_club=0)
 	{
-		if ($GLOBALS['SITE_DB']->connection_write!=$GLOBALS['SITE_DB']->connection_write)
+		if ($GLOBALS['SITE_DB']->connection_write!=$GLOBALS['FORUM_DB']->connection_write)
 		{
 			attach_message(do_lang_tempcode('EDITING_ON_WRONG_MSN'),'warn');
 		}
@@ -313,10 +313,17 @@ class Module_admin_ocf_groups extends standard_aed_module
 			'g_is_presented_at_install'=>do_lang_tempcode('IS_PRESENTED_AT_INSTALL'),
 			'g_is_default'=>do_lang_tempcode('DEFAULT_GROUP'),
 			'g_open_membership'=>do_lang_tempcode('OPEN_MEMBERSHIP'),
-			'g_promotion_threshold ASC,id'=>do_lang_tempcode('PROMOTION_TARGET'),
+		);
+		if (addon_installed('points'))
+		{
+			$sortables=array_merge($sortables,array(
+				'g_promotion_threshold ASC,id'=>do_lang_tempcode('PROMOTION_TARGET'),
+			));
+		}
+		$sortables=array_merge($sortables,array(
 			'g_is_super_admin'=>do_lang_tempcode('SUPER_ADMIN'),
 			'g_order'=>do_lang_tempcode('ORDER'),
-		);
+		));
 		if ($current_ordering=='g_promotion_threshold ASC,id ASC')
 		{
 			list($sortable,$sort_order)=array('g_promotion_threshold ASC,id','ASC');
@@ -334,18 +341,26 @@ class Module_admin_ocf_groups extends standard_aed_module
 			$NON_CANONICAL_PARAMS[]='sort';
 		}
 
-		$header_row=results_field_title(array(
+		$_header_row=array(
 			do_lang_tempcode('NAME'),
 			do_lang_tempcode('IS_PRESENTED_AT_INSTALL'),
 			do_lang_tempcode('DEFAULT_GROUP'),
 			//do_lang_tempcode('IS_PRIVATE_CLUB'),
 			//do_lang_tempcode('GROUP_LEADER'),
 			do_lang_tempcode('OPEN_MEMBERSHIP'),
-			do_lang_tempcode('PROMOTION_TARGET'),
+		);
+		if (addon_installed('points'))
+		{
+			$_header_row=array_merge($_header_row,array(
+				do_lang_tempcode('PROMOTION_TARGET'),
+			));
+		}
+		$_header_row=array_merge($_header_row,array(
 			do_lang_tempcode('SUPER_ADMIN'),
 			do_lang_tempcode('ORDER'),
 			do_lang_tempcode('ACTIONS'),
-		),$sortables,'sort',$sortable.' '.$sort_order);
+		));
+		$header_row=results_field_title($_header_row,$sortables,'sort',$sortable.' '.$sort_order);
 
 		$fields=new ocp_tempcode();
 
@@ -381,9 +396,16 @@ class Module_admin_ocf_groups extends standard_aed_module
 				//($row['g_is_private_club']==1)?do_lang_tempcode('YES'):do_lang_tempcode('NO'),
 				//is_null($row['g_group_leader'])?do_lang_tempcode('NA_EM'):make_string_tempcode($GLOBALS['FORUM_DRIVER']->get_username($row['g_group_leader'])),
 				($row['g_open_membership']==1)?do_lang_tempcode('YES'):do_lang_tempcode('NO'),
-				is_null($row['g_promotion_target'])?do_lang_tempcode('NA_EM'):(make_string_tempcode(ocf_get_group_name($row['g_promotion_target']).' ('.strval($row['g_promotion_threshold']).')')),
-				($row['g_is_super_admin']==1)?do_lang_tempcode('YES'):do_lang_tempcode('NO'),
 			);
+			if (addon_installed('points'))
+			{
+				$fr=array_merge($fr,array(
+					is_null($row['g_promotion_target'])?do_lang_tempcode('NA_EM'):(make_string_tempcode(ocf_get_group_name($row['g_promotion_target']).' ('.strval($row['g_promotion_threshold']).')')),
+				));
+			}
+			$fr=array_merge($fr,array(
+				($row['g_is_super_admin']==1)?do_lang_tempcode('YES'):do_lang_tempcode('NO'),
+			));
 
 			$orderlist=new ocp_tempcode();
 			$selected_one=false;
@@ -431,10 +453,10 @@ class Module_admin_ocf_groups extends standard_aed_module
 
 			if (is_null($row['g_promotion_target']))
 			{
-				$text=do_lang_tempcode('EXTENDED_GROUP_TITLE_NORMAL',get_translated_text($row['g_name'],$GLOBALS['FORUM_DB']),strval($row['id']),array(integer_format($row['g_order']+1),integer_format($num_members)));
+				$text=do_lang_tempcode('EXTENDED_GROUP_TITLE_NORMAL',escape_html(get_translated_text($row['g_name'],$GLOBALS['FORUM_DB'])),strval($row['id']),array(integer_format($row['g_order']+1),integer_format($num_members)));
 			} else
 			{
-				$text=do_lang_tempcode('EXTENDED_GROUP_TITLE_RANK',get_translated_text($row['g_name'],$GLOBALS['FORUM_DB']),strval($row['id']),array(strval($row['g_promotion_target']),integer_format($row['g_order']+1),integer_format($num_members)));
+				$text=do_lang_tempcode('EXTENDED_GROUP_TITLE_RANK',escape_html(get_translated_text($row['g_name'],$GLOBALS['FORUM_DB'])),strval($row['id']),array(strval($row['g_promotion_target']),integer_format($row['g_order']+1),integer_format($num_members)));
 			}
 			$fields->attach(form_input_list_entry(strval($row['id']),false,$text));
 		}
@@ -468,8 +490,12 @@ class Module_admin_ocf_groups extends standard_aed_module
 		}
 		$myrow=$rows[0];
 
-		$username=$GLOBALS['FORUM_DRIVER']->get_username($myrow['g_group_leader']);
-		if (is_null($username)) $username='';//do_lang('UNKNOWN');
+		$username='';
+		if (!is_null($myrow['g_group_leader']))
+		{
+			$username=$GLOBALS['FORUM_DRIVER']->get_username($myrow['g_group_leader']);
+			if (is_null($username)) $username='';//do_lang('UNKNOWN');
+		}
 
 		if ((intval($id)==db_get_first_id()+8) && ($GLOBALS['FORUM_DB']->query_value('f_groups','COUNT(*)',array('g_is_presented_at_install'=>'1'))==0))
 			$myrow['g_is_presented_at_install']=1;
@@ -505,7 +531,7 @@ class Module_admin_ocf_groups extends standard_aed_module
 				{
 					if ($i!=0)
 						$subs->attach(do_lang_tempcode('LIST_SEP'));
-					$subs->attach(hyperlink(build_url(array('page'=>'admin_ecommerce','type'=>'_ed','id'=>$sub['id']),get_module_zone('admin_ecommerce')),get_translated_text($sub['s_title'],$GLOBALS[(get_forum_type()=='ocf')?'FORUM_DB':'SITE_DB'])));
+					$subs->attach(hyperlink(build_url(array('page'=>'admin_ecommerce','type'=>'_ed','id'=>$sub['id']),get_module_zone('admin_ecommerce')),get_translated_text($sub['s_title'],$GLOBALS[(get_forum_type()=='ocf')?'FORUM_DB':'SITE_DB']),false,true));
 				}
 				require_lang('ecommerce');
 				$text->attach(paragraph(do_lang_tempcode('HAS_THESE_SUBS',$subs)));

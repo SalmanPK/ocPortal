@@ -328,7 +328,13 @@ function ocf_join_actual($captcha_if_enabled=true,$intro_message_if_enabled=true
 	$coppa=(get_option('is_on_coppa')=='1') && (utctime_to_usertime(time()-mktime(0,0,0,$dob_month,$dob_day,$dob_year))/31536000.0<13.0);
 	if (!$coppa_if_enabled) $coppa=false;
 	$validated=($require_new_member_validation || $coppa)?0:1;
-	if (is_null($member_id)) $member_id=ocf_make_member($username,$password,$email_address,$groups,$dob_day,$dob_month,$dob_year,$actual_custom_fields,$timezone,$primary_group,$validated,time(),time(),'',NULL,'',0,(get_option('default_preview_guests')=='1')?1:0,$reveal_age,'','','',1,(get_value('no_auto_notifications')==='1')?0:1,$language,$allow_emails,$allow_emails_from_staff,'',get_ip_address(),$validated_email_confirm_code,true,'','');
+	if (is_null($member_id))
+	{
+		$member_id=ocf_make_member($username,$password,$email_address,$groups,$dob_day,$dob_month,$dob_year,$actual_custom_fields,$timezone,$primary_group,$validated,time(),time(),'',NULL,'',0,(get_option('default_preview_guests')=='1')?1:0,$reveal_age,'','','',1,(get_value('no_auto_notifications')==='1')?0:1,$language,$allow_emails,$allow_emails_from_staff,'',get_ip_address(),$validated_email_confirm_code,true,'','');
+	} else
+	{
+		attach_message(do_lang_tempcode('ALREADY_EXISTS',escape_html($username)),'notice');
+	}
 
 	// Send confirm mail
 	if (!$skip_confirm)
@@ -341,7 +347,7 @@ function ocf_join_actual($captcha_if_enabled=true,$intro_message_if_enabled=true
 		$url_simple=$_url_simple->evaluate();
 		$redirect=get_param('redirect','');
 		if ($redirect!='') $url.='&redirect='.ocp_url_encode($redirect);
-		$message=do_lang('OCF_SIGNUP_TEXT',comcode_escape(get_site_name()),comcode_escape($url),array($url_simple,$email_address,strval($validated_email_confirm_code)),$language);
+		$message=do_lang('OCF_SIGNUP_TEXT',comcode_escape(get_site_name()),comcode_escape($url),array($url_simple,$email_address,$validated_email_confirm_code),$language);
 		require_code('mail');
 		if (!$coppa) mail_wrap(do_lang('CONFIRM_EMAIL_SUBJECT',get_site_name(),NULL,NULL,$language),$message,array($email_address),$username,'','',3,NULL,false,NULL,false,false,false,'MAIL',true);
 	}
@@ -430,7 +436,7 @@ function ocf_join_actual($captcha_if_enabled=true,$intro_message_if_enabled=true
 		if ($instant_login) // Automatic instant log in
 		{
 			require_code('users_active_actions');
-			handle_active_login($username);
+			handle_active_login($username); // The auto-login simulates a real login, i.e. actually checks the password from the form against the real account. So no security hole when "re-registering" a real user
 			$message->attach(do_lang_tempcode('OCF_LOGIN_AUTO'));
 		} else // Invite them to explicitly instant log in
 		{

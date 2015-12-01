@@ -335,7 +335,7 @@ class Module_banners
 			if (addon_installed('unvalidated')) $fr[]=($row['validated']==1)?do_lang_tempcode('YES'):do_lang_tempcode('NO');
 			$fr[]=protect_from_escaping(hyperlink($view_link,do_lang_tempcode('VIEW'),false,true,$row['name']));
 
-			$fields->attach(results_entry($fr),true);
+			$fields->attach(results_entry($fr,true));
 		}
 
 		$table=results_table(do_lang('BANNERS'),get_param_integer('start',0),'start',get_param_integer('max',20),'max',$max_rows,$header_row,$fields,$sortables,$sortable,$sort_order);
@@ -380,7 +380,7 @@ class Module_banners
 		}
 
 		if ($myrow['views_to']!=0)
-			$click_through=protect_from_escaping(escape_html(float_format(round(100.0*($myrow['hits_to']/$myrow['views_to'])))));
+			$click_through=protect_from_escaping(escape_html(float_format(100.0*($myrow['hits_to']/$myrow['views_to']))));
 		else $click_through=do_lang_tempcode('NA_EM');
 
 		$has_banner_network=$GLOBALS['SITE_DB']->query_value('banners','SUM(views_from)')!=0.0;

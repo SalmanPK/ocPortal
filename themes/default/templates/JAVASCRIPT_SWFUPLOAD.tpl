@@ -1233,8 +1233,6 @@ function doSubmit(e,ob,recurse) {
 		smooth_scroll(find_pos_y(txtFileName,true));
 	} else // Has uploaded
 	{
-		window.just_checking_requirements=false;
-
 		window.form_submitting=btnSubmit.form; // For IE
 
 		if (typeof ob.originalClickHandler=='undefined')
@@ -1406,6 +1404,8 @@ function uploadComplete(file, ob) {
 
 		if ((typeof ob.submitting!='undefined') && (ob.submitting))
 		{
+			window.just_checking_requirements=false;
+
 			window.form_submitting=btnSubmit.form; // For IE
 			if (typeof ob.originalClickHandler!='undefined')
 			{
@@ -1818,7 +1818,7 @@ function replaceFileInput(page_type,name,_btnSubmitID,posting_field_name,filter)
 			upload_complete_handler : uploadComplete,
 
 			// Button Settings
-			button_image_url : '{$IMG;,pageitem/upload}'.replace(/^http:/,window.location.protocol),
+			button_image_url : '{$IMG;,pageitem/upload}'.replace(/^https?:/,window.location.protocol),
 			button_placeholder_id : 'spanButtonPlaceholder_'+name,
 			button_width: 66,
 			button_height: 20,
@@ -1840,7 +1840,7 @@ function replaceFileInput(page_type,name,_btnSubmitID,posting_field_name,filter)
 		var newClearBtn=document.createElement('input');
 		newClearBtn.id='fsClear_'+name;
 		newClearBtn.type='image';
-		newClearBtn.setAttribute('src','{$IMG;,pageitem/clear}'.replace(/^http:/,window.location.protocol));
+		newClearBtn.setAttribute('src','{$IMG;,pageitem/clear}'.replace(/^https?:/,window.location.protocol));
 		newClearBtn.style.marginLeft='8px';
 		newClearBtn.style.verticalAlign='top';
 		newClearBtn.value='{!UPLOAD;^}: {!CLEAR;^}';

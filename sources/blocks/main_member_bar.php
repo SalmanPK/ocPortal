@@ -62,8 +62,8 @@ class Block_main_member_bar
 
 			$profile_url=$GLOBALS['OCF_DRIVER']->member_profile_url($member_id,true,true);
 
-			$new_topics=$GLOBALS['FORUM_DB']->query_value_null_ok_full('SELECT COUNT(*) AS mycnt FROM '.$GLOBALS['FORUM_DB']->get_table_prefix().'f_topics WHERE NOT t_forum_id IS NULL AND t_cache_first_time>'.strval((integer)$member_info['last_visit_time']));
-			$new_posts=$GLOBALS['FORUM_DB']->query_value_null_ok_full('SELECT COUNT(*) AS mycnt FROM '.$GLOBALS['FORUM_DB']->get_table_prefix().'f_posts WHERE NOT p_cache_forum_id IS NULL AND p_time>'.strval((integer)$member_info['last_visit_time']));
+			$new_topics=$GLOBALS['FORUM_DB']->query_value_null_ok_full('SELECT COUNT(*) AS mycnt FROM '.$GLOBALS['FORUM_DB']->get_table_prefix().'f_topics WHERE t_forum_id IS NOT NULL AND t_cache_first_time>'.strval((integer)$member_info['last_visit_time']));
+			$new_posts=$GLOBALS['FORUM_DB']->query_value_null_ok_full('SELECT COUNT(*) AS mycnt FROM '.$GLOBALS['FORUM_DB']->get_table_prefix().'f_posts WHERE p_cache_forum_id IS NOT NULL AND p_time>'.strval((integer)$member_info['last_visit_time']));
 
 			$max_avatar_height=ocf_get_member_best_group_property($member_id,'max_avatar_height');
 
@@ -102,12 +102,12 @@ class Block_main_member_bar
 
 		} else // Guest
 		{
-			if (count($_POST)>0)
+			if (count($_POST)>0 || (get_page_name()=='join') || (get_page_name()=='login'))
 			{
-				$_this_url=build_url(array('page'=>'forumview'),'forum',array('keep_session'=>1));
+				$_this_url=build_url(array('page'=>'forumview'),'forum',array('keep_session'=>1,'redirect'=>1));
 			} else
 			{
-				$_this_url=build_url(array('page'=>'_SELF'),'_SELF',array('keep_session'=>1),true);
+				$_this_url=build_url(array('page'=>'_SELF'),'_SELF',array('keep_session'=>1,'redirect'=>1),true);
 			}
 			$this_url=$_this_url->evaluate();
 			$login_url=build_url(array('page'=>'login','type'=>'login','redirect'=>$this_url),get_module_zone('login'));

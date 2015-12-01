@@ -402,6 +402,13 @@ class Module_search
 			if ($catalogue_name!='') $url_map['catalogue_name']=$catalogue_name;
 			$force_non_tabular=get_param_integer('force_non_tabular',0);
 			if ($force_non_tabular==1) $url_map['force_non_tabular']=1;
+			$force_like=get_param_integer('force_like',0);
+			if ($force_like==1)
+			{
+				$url_map['force_like']=1;
+				$boolean_search=get_param_integer('boolean_search',0);
+				if ($boolean_search==1) $url_map['boolean_search']=1;
+			}
 			$embedded=get_param_integer('embedded',0);
 			if ($embedded==1) $url_map['embedded']=1;
 			$url=build_url($url_map,'_SELF',NULL,false,true);
@@ -442,7 +449,7 @@ class Module_search
 				}
 
 				require_code('form_templates');
-				$tree=do_template('FORM_SCREEN_INPUT_TREE_LIST',array('_GUID'=>'25368e562be3b4b9c6163aa008b47c91','MULTI_SELECT'=>false,'TABINDEX'=>strval(get_form_field_tabindex()),'NICE_LABEL'=>(is_null($nice_label) || $nice_label=='-1')?'':$nice_label,'END_OF_FORM'=>true,'REQUIRED'=>false,'USE_SERVER_ID'=>false,'NAME'=>'search_under','DEFAULT'=>$under,'HOOK'=>$ajax_hook,'ROOT_ID'=>'','OPTIONS'=>serialize($ajax_options)));
+				$tree=do_template('FORM_SCREEN_INPUT_TREE_LIST',array('_GUID'=>'25368e562be3b4b9c6163aa008b47c91','MULTI_SELECT'=>false,'TABINDEX'=>strval(get_form_field_tabindex()),'NICE_LABEL'=>(is_null($nice_label) || $nice_label=='-1')?'':$nice_label,'END_OF_FORM'=>true,'REQUIRED'=>'','USE_SERVER_ID'=>false,'NAME'=>'search_under','DEFAULT'=>$under,'HOOK'=>$ajax_hook,'ROOT_ID'=>'','OPTIONS'=>serialize($ajax_options)));
 			} else
 			{
 				$ajax=false;
@@ -457,7 +464,7 @@ class Module_search
 			$options=new ocp_tempcode();
 			if (array_key_exists('special_on',$info))
 				foreach ($info['special_on'] as $name=>$display)
-					$options->attach(do_template('SEARCH_FOR_SEARCH_DOMAIN_OPTION',array('_GUID'=>'c1853f42d0a110026453f8b94c9f623c','CHECKED'=>(!is_null($content)) || (get_param_integer('option_'.$id.'_'.$name,0)==1),'NAME'=>'option_'.$id.'_'.$name,'DISPLAY'=>$display)));
+					$options->attach(do_template('SEARCH_FOR_SEARCH_DOMAIN_OPTION',array('_GUID'=>'c1853f42d0a110026453f8b94c9f623c','CHECKED'=>(is_null($content)) || (get_param_integer('option_'.$id.'_'.$name,0)==1),'NAME'=>'option_'.$id.'_'.$name,'DISPLAY'=>$display)));
 			if (array_key_exists('special_off',$info))
 				foreach ($info['special_off'] as $name=>$display)
 					$options->attach(do_template('SEARCH_FOR_SEARCH_DOMAIN_OPTION',array('_GUID'=>'2223ada7636c85e6879feb9a6f6885d2','CHECKED'=>(get_param_integer('option_'.$id.'_'.$name,0)==1),'NAME'=>'option_'.$id.'_'.$name,'DISPLAY'=>$display)));

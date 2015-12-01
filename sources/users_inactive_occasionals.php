@@ -140,12 +140,17 @@ function create_session($member,$session_confirmed=0,$invisible=false)
 		{
 			// See if this is the first visit today
 			$test=$GLOBALS['SITE_DB']->query_value('stats','MAX(date_and_time)',array('the_user'=>$member));
-			if ($test<time()-60*60*24)
+			if (!is_null($test))
 			{
-				require_code('points');
-				$_before=point_info($member);
-				if (array_key_exists('points_gained_given',$_before))
-					$GLOBALS['FORUM_DRIVER']->set_custom_field($member,'points_gained_given',strval(intval($_before['points_gained_given'])+$points_per_daily_visit));
+				require_code('temporal');
+				require_code('tempcode');
+				if (date('d/m/Y',tz_time($test,get_site_timezone()))!=date('d/m/Y',tz_time(time(),get_site_timezone())))
+				{
+					require_code('points');
+					$_before=point_info($member);
+					if (array_key_exists('points_gained_given',$_before))
+						$GLOBALS['FORUM_DRIVER']->set_custom_field($member,'points_gained_given',strval(intval($_before['points_gained_given'])+$points_per_daily_visit));
+				}
 			}
 		}
 	}
@@ -221,6 +226,7 @@ function try_su_login($member)
 	if (has_specific_permission($member,'assume_any_member'))
 	{
 		$su=$GLOBALS['FORUM_DRIVER']->get_member_from_username($ks);
+		if ((is_null($su)) && (is_numeric($ks))) $su=intval($ks);
 
 		if (is_null($su))
 		{
@@ -320,7 +326,7 @@ function try_cookie_login()
 				if (array_key_exists($real_member_cookie,$unserialize))
 				{
 					$the_member=$unserialize[$real_member_cookie];
-					if (get_magic_quotes_gpc()) $the_member=addslashes($the_member);
+					if (get_magic_quotes_gpc()) $the_member=addslashes(@strval($the_member));
 					$_COOKIE[get_member_cookie()]=$the_member;
 				}
 				if (array_key_exists($real_pass_cookie,$unserialize))

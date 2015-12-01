@@ -199,13 +199,14 @@ function is_wide()
  * Get string length, with utf-8 awareness where possible/required.
  *
  * @param  string		The string to get the length of.
+ * @param  boolean	Whether to force unicode as on.
  * @return integer	The string length.
  */
-function ocp_mb_strlen($in)
+function ocp_mb_strlen($in,$force=false)
 {
-	if (strtolower(get_charset())!='utf-8') return strlen($in);
-	if (function_exists('mb_strlen')) return @mb_strlen($in); // @ is because there could be invalid unicode involved
-	if (function_exists('iconv_strlen')) return @iconv_strlen($in);
+	if ((!$force) && (strtolower(get_charset())!='utf-8')) return strlen($in);
+	if (function_exists('mb_strlen')) return @mb_strlen($in,$force?'utf-8':get_charset()); // @ is because there could be invalid unicode involved
+	if (function_exists('iconv_strlen')) return @iconv_strlen($in,$force?'utf-8':get_charset());
 	return strlen($in);
 }
 
@@ -220,12 +221,12 @@ function ocp_mb_strlen($in)
  */
 function ocp_mb_substr($in,$from,$amount=NULL,$force=false)
 {
-	if (is_null($amount)) $amount=ocp_mb_strlen($in)-$from;
+	if (is_null($amount)) $amount=ocp_mb_strlen($in,$force)-$from;
 
 	if ((!$force) && (strtolower(get_charset())!='utf-8')) return substr($in,$from,$amount);
 
-	if (function_exists('iconv_substr')) return @iconv_substr($in,$from,$amount);
-	if (function_exists('mb_substr')) return @mb_substr($in,$from,$amount);
+	if (function_exists('iconv_substr')) return @iconv_substr($in,$from,$amount,$force?'utf-8':get_charset());
+	if (function_exists('mb_substr')) return @mb_substr($in,$from,$amount,$force?'utf-8':get_charset());
 
 	$ret=substr($in,$from,$amount);
 	$end=ord(substr($ret,-1));
@@ -433,7 +434,7 @@ function addon_installed($addon,$non_bundled_too=false)
 		if (function_exists('persistent_cache_get')) $ADDON_INSTALLED_CACHE=persistent_cache_get('ADDONS_INSTALLED');
 	}
 	if (isset($ADDON_INSTALLED_CACHE[$addon])) return $ADDON_INSTALLED_CACHE[$addon];
-	$answer=is_file(get_file_base().'/sources/hooks/systems/addon_registry/'.filter_naughty($addon).'.php') || is_file(get_file_base().'/sources_custom/hooks/addon_registry/'.filter_naughty($addon).'.php');
+	$answer=is_file(get_file_base().'/sources/hooks/systems/addon_registry/'.filter_naughty($addon).'.php') || is_file(get_file_base().'/sources_custom/hooks/systems/addon_registry/'.filter_naughty($addon).'.php');
 	if ((!$answer) && ($non_bundled_too))
 	{
 		$test=$GLOBALS['SITE_DB']->query_value_null_ok('addons','addon_name',array('addon_name'=>$addon));
@@ -496,7 +497,7 @@ function float_format($val,$decs_wanted=2,$only_needed_decs=false)
 		$str=substr($str,0,strlen($str)-$decs_here+$decs_wanted);
 		if ($decs_wanted==0) $str=rtrim($str,'.');
 	}
-	if ($only_needed_decs) $str=preg_replace('#\.$#','',preg_replace('#0+$#','',$str));
+	if ($only_needed_decs && $decs_wanted!=0) $str=preg_replace('#\.$#','',preg_replace('#0+$#','',$str));
 	return $str;
 }
 
@@ -624,6 +625,9 @@ function ocf_require_all_forum_stuff()
  */
 function globalise($middle,$message=NULL,$type='',$include_header_and_footer=false)
 {
+	global $EXITING;
+	$EXITING++;
+
 	if (!$include_header_and_footer) $_GET['wide_high']='1'; // HACKHACK
 
 	require_code('site');
@@ -631,7 +635,7 @@ function globalise($middle,$message=NULL,$type='',$include_header_and_footer=fal
 
 	global $CYCLES; $CYCLES=array(); // Here we reset some Tempcode environmental stuff, because template compilation or preprocessing may have dirtied things
 
-	if (!running_script('dload') && !running_script('attachment') && !running_script('index'))
+	if (!running_script('dload') && !running_script('attachment') && !running_script('index') && !running_script('validateip')/*TODO: Change in v10 to new script name*/)
 	{
 		global $ATTACHED_MESSAGES;
 		$middle->handle_symbol_preprocessing();
@@ -676,7 +680,7 @@ function ocp_tempnam($prefix)
 	if ((($tempnam===false) || ($tempnam==''/*Should not be blank, but seen in the wild*/)) && (!$problem_saving))
 	{
 		$problem_saving=true;
-		$tempnam=tempnam($local_path,$prefix);
+		$tempnam=tempnam($local_path,'tmpfile__'.$prefix);
 	}
 	return $tempnam;
 }
@@ -996,6 +1000,24 @@ function get_ip_address($amount=4)
 	if (($fw!='') && ($fw!='127.0.0.1') && (substr($fw,0,8)!='192.168.') && (substr($fw,0,3)!='10.') && (is_valid_ip($fw)) && ($fw!=ocp_srv('SERVER_ADDR'))) $ip=$fw;
 	else */$ip=ocp_srv('REMOTE_ADDR');
 
+	global $SITE_INFO;
+	if (($amount==3) && (array_key_exists('full_ips',$SITE_INFO)) && ($SITE_INFO['full_ips']=='1')) // Extra configurable security
+	{
+		$amount=4;
+	}
+
+	return normalise_ip_address($ip,$amount);
+}
+
+/**
+ * Normalise a provided IP address
+ *
+ * @param  IP				The IP address to normalise
+ * @param  ?integer		Amount to mask out (NULL: do not)
+ * @return IP				The normalised IP address
+ */
+function normalise_ip_address($ip,$amount=NULL)
+{
 	// Bizarro-filter (found "in the wild")
 	$pos=strpos($ip,',');
 	if ($pos!==false) $ip=substr($ip,0,$pos);
@@ -1004,12 +1026,6 @@ function get_ip_address($amount=4)
 
 	if (!is_valid_ip($ip)) return '';
 
-	global $SITE_INFO;
-	if (($amount==3) && (array_key_exists('full_ips',$SITE_INFO)) && ($SITE_INFO['full_ips']=='1')) // Extra configurable security
-	{
-		$amount=4;
-	}
-
 	if (strpos($ip,'.')===false)
 	{
 		if (substr_count($ip,':')<7)
@@ -1017,25 +1033,31 @@ function get_ip_address($amount=4)
 			$ip=str_replace('::',str_repeat(':',(7-substr_count($ip,':'))+2),$ip);
 		}
 		$parts=explode(':',$ip);
-		for ($i=0;$i<$amount*2;$i++)
+		for ($i=0;$i<(is_null($amount)?8:($amount*2));$i++)
 		{
 			$parts[$i]=isset($parts[$i])?str_pad($parts[$i],4,'0',STR_PAD_LEFT):'0000';
 		}
-		for ($i=$amount*2;$i<8;$i++)
+		if (!is_null($amount))
 		{
-			$parts[$i]='*';
+			for ($i=$amount*2;$i<8;$i++)
+			{
+				$parts[$i]='*';
+			}
 		}
 		return implode(':',$parts);
 	} else
 	{
 		$parts=explode('.',$ip);
-		for ($i=0;$i<$amount;$i++)
+		for ($i=0;$i<(is_null($amount)?4:$amount);$i++)
 		{
 			if (!array_key_exists($i,$parts)) $parts[$i]='0';
 		}
-		for ($i=$amount;$i<4;$i++)
+		if (!is_null($amount))
 		{
-			$parts[$i]='*';
+			for ($i=$amount;$i<4;$i++)
+			{
+				$parts[$i]='*';
+			}
 		}
 		return implode('.',$parts);
 	}
@@ -1346,7 +1368,7 @@ function member_tracking_update($page,$type,$id)
  * @param  ?ID_TEXT		The page-type they need to be viewing (NULL: environment current) (blank: don't care)
  * @param  ?SHORT_TEXT	The type-id they need to be viewing (NULL: environment current) (blank: don't care)
  * @param  boolean		Whether this has to be done over the forum driver (multi site network)
- * @return ?array			A map of member-ids to rows about them (NULL: Too many)
+ * @return ?array			A map of member-ids to rows about them (except for guest, which is a count) (NULL: Too many)
  */
 function get_members_viewing($page=NULL,$type=NULL,$id=NULL,$forum_layer=false)
 {
@@ -1366,12 +1388,17 @@ function get_members_viewing($page=NULL,$type=NULL,$id=NULL,$forum_layer=false)
 	if (($id!==NULL) && ($id!='')) $map['mt_id']=$id;
 	$map['session_invisible']=0;
 	$db=($forum_layer?$GLOBALS['FORUM_DB']:$GLOBALS['SITE_DB']);
-	$results=$db->query_select('member_tracking t LEFT JOIN '.$db->get_table_prefix().'sessions s ON t.mt_member_id=s.the_user',array('*'),$map,'ORDER BY mt_member_id',200);
+	$results=$db->query_select('member_tracking t LEFT JOIN '.$db->get_table_prefix().'sessions s ON t.mt_member_id=s.the_user',array('*'),$map,' AND mt_member_id<>'.strval($GLOBALS['FORUM_DRIVER']->get_guest_id()).' ORDER BY mt_member_id',200);
 	if (count($results)==200) return NULL;
+
+	unset($map['session_invisible']);
+	$num_guests=$db->query_value('member_tracking t','COUNT(*)',$map,' AND mt_member_id='.strval($GLOBALS['FORUM_DRIVER']->get_guest_id()));
 
 	$results=remove_duplicate_rows($results,'mt_member_id');
 
-	$out=array();
+	$out=array(
+		$GLOBALS['FORUM_DRIVER']->get_guest_id()=>$num_guests,
+	);
 	foreach ($results as $row)
 	{
 		if (!member_blocked(get_member(),$row['mt_member_id'])) $out[$row['mt_member_id']]=$row;
@@ -1679,6 +1706,7 @@ function is_mobile($user_agent=NULL,$truth=false)
 						'Minimo', // By Mozilla
 						'Fennec', // By Mozilla (being outmoded by minimo)
 						'Mobile Safari', // Usually Android
+						'Android',
 						'lynx',
 						'Links',
 						'iPhone',
@@ -1990,7 +2018,7 @@ function seo_meta_load_for($type,$id,$title=NULL)
 	$result=seo_meta_get_for($type,$id);
 	global $SEO_KEYWORDS,$SEO_DESCRIPTION,$SEO_TITLE;
 	if ($SEO_TITLE=='DO_NOT_REPLACE') return; // main_include_module block set this
-	if ($result[0]!='') $SEO_KEYWORDS=array_map('trim',explode(',',$result[0]));
+	if ($result[0]!='') $SEO_KEYWORDS=array_map('trim',explode(',',trim($result[0],',')));
 	if ($result[1]!='') $SEO_DESCRIPTION=$result[1];
 	if ($title!==NULL) $SEO_TITLE=str_replace('&ndash;','-',str_replace('&copy;','(c)',str_replace('&#039;','\'',$title)));
 }
@@ -2187,7 +2215,12 @@ function titleify($boring)
 {
 	$ret=ucwords(str_replace('_',' ',$boring));
 	$ret=str_replace('Ocportal','ocPortal',$ret);
+	$ret=preg_replace('#(^|\s)Url(\s|$)#','$1URL$2',$ret);
+	$ret=preg_replace('#(^|\s)Id(\s|$)#','$1ID$2',$ret);
 	if (substr($ret,0,3)=='Oc ') $ret='oc'.str_replace(' ','',substr($ret,3));
+
+	if ($GLOBALS['XSS_DETECT'] && ocp_is_escaped($boring)) ocp_mark_as_escaped($ret);
+
 	return $ret;
 }
 
@@ -2586,7 +2619,7 @@ function update_catalogue_content_ref($type,$from,$to)
 		$GLOBALS['SITE_DB']->query_update('catalogue_fields f JOIN '.$GLOBALS['SITE_DB']->get_table_prefix().'catalogue_efv_short v ON v.cf_id=f.id',array('cv_value'=>$to),array('cv_value'=>$from,'cf_type'=>$type));
 	} else
 	{
-		$fields=$GLOBALS['SITE_DB']->query_update('catalogue_fields',array('id'),array('cf_type'=>$type));
+		$fields=$GLOBALS['SITE_DB']->query_select('catalogue_fields',array('id'),array('cf_type'=>$type));
 		foreach ($fields as $field)
 		{
 			$GLOBALS['SITE_DB']->query_update('catalogue_efv_short',array('cv_value'=>$to),array('cv_value'=>$from,'cf_id'=>$field['id']));

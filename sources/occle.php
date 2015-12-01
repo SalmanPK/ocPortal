@@ -45,7 +45,7 @@ function occle_script()
 		$site_closed=get_option('site_closed');
 		if (($site_closed=='1') && (!has_specific_permission(get_member(),'access_closed_site')) && (!$GLOBALS['IS_ACTUALLY_ADMIN']))
 		{
-			header('Content-Type: text/plain');
+			header('Content-Type: text/plain; charset='.get_charset());
 			@exit(get_option('closed'));
 		}
 
@@ -223,7 +223,7 @@ class virtual_bash
 	{
 		if (count($this->parsed_input)<1) return false;
 
-		header('Content-Type: text/xml');
+		header('Content-Type: text/xml; charset='.get_charset());
 		header('HTTP/1.0 200 Ok');
 
 		if (is_object($this->output[STREAM_STDCOMMAND])) $this->output[STREAM_STDCOMMAND]=$this->output[STREAM_STDCOMMAND]->evaluate();
@@ -238,6 +238,9 @@ class virtual_bash
 		@ob_end_clean(); // Cleanup any output that may have somehow leaked to this point
 
 		$output='<'.'?xml version="1.0" encoding="'.get_charset().'" ?'.'>
+<!DOCTYPE response [
+<!ENTITY rarr "&#8594;" >
+]>
 <response>
 	<result>
 		<command>'.xmlentities($this->current_input).'</command>
@@ -966,7 +969,7 @@ class virtual_bash
 			{
 				//It's not a lone command; see if it's a script - check first in the main script dir
 				if (file_exists(get_custom_file_base().'/data/modules/admin_occle/'.filter_naughty_harsh($this->parsed_input[SECTION_COMMAND],true))) $script_file=get_custom_file_base().'/data/modules/admin_occle/'.filter_naughty_harsh($this->parsed_input[SECTION_COMMAND]); //It's in the main script dir
-				else $script_file=$this->_find_script_file(filter_naughty_harsh($this->parsed_input[SECTION_COMMAND])); //Exhaustive search
+				else $script_file=$this->_find_script_file($this->parsed_input[SECTION_COMMAND]); //Exhaustive search
 
 				if (($script_file!==false) && (is_readable($script_file)))
 				{
@@ -1005,11 +1008,11 @@ class virtual_bash
 		{
 			//SQL command
 			$GLOBALS['NO_DB_SCOPE_CHECK']=true;
-			$occle_output=$GLOBALS['SITE_DB']->query($this->parsed_input[SECTION_COMMAND],NULL,NULL,true);
+			$occle_output=$GLOBALS['SITE_DB']->query($this->parsed_input[SECTION_COMMAND],NULL,NULL,true,true);
 			$GLOBALS['NO_DB_SCOPE_CHECK']=false;
 			if (count($occle_output)>100)
 			{
-				$occle_output=$GLOBALS['SITE_DB']->query($this->parsed_input[SECTION_COMMAND],100,NULL,true);
+				$occle_output=$GLOBALS['SITE_DB']->query($this->parsed_input[SECTION_COMMAND],100,NULL,true,true);
 				$occle_output[]=array('...'=>'...');
 			}
 
@@ -1203,24 +1206,24 @@ class virtual_bash
 		//NOTE: Variables throughout this function use the $occle_ prefix to avoid conflicts with any created through executing PHP commands from the CL
 		if (get_file_base()==get_custom_file_base())
 		{
-			if (array_key_exists('occle_state',$_COOKIE))
+			if (array_key_exists('occle_state_b64',$_COOKIE))
 			{
-				if (get_magic_quotes_gpc()) $_COOKIE['occle_state']=stripslashes($_COOKIE['occle_state']);
-				$occle_state_diff=unserialize($_COOKIE['occle_state']);
+				$occle_state_diff=@unserialize(base64_decode($_COOKIE['occle_state_b64']));
+				if (!is_array($occle_state_diff)) $occle_state_diff=array();
 			}
 			else $occle_state_diff=array();
 
-			if (array_key_exists('occle_state_lang',$_COOKIE))
+			if (array_key_exists('occle_state_lang_b64',$_COOKIE))
 			{
-				if (get_magic_quotes_gpc()) $_COOKIE['occle_state_lang']=stripslashes($_COOKIE['occle_state_lang']);
-				$occle_state_lang_diff=unserialize($_COOKIE['occle_state_lang']);
+				$occle_state_lang_diff=@unserialize(base64_decode($_COOKIE['occle_state_lang_b64']));
+				if (!is_array($occle_state_lang_diff)) $occle_state_lang_diff=array();
 			}
 			else $occle_state_lang_diff=array();
 
-			if (array_key_exists('occle_state_code',$_COOKIE))
+			if (array_key_exists('occle_state_code_b64',$_COOKIE))
 			{
-				if (get_magic_quotes_gpc()) $_COOKIE['occle_state_code']=stripslashes($_COOKIE['occle_state_code']);
-				$occle_state_code_diff=unserialize($_COOKIE['occle_state_code']);
+				$occle_state_code_diff=@unserialize(base64_decode($_COOKIE['occle_state_code_b64']));
+				if (!is_array($occle_state_code_diff)) $occle_state_code_diff=array();
 			}
 			else $occle_state_code_diff=array();
 
@@ -1242,6 +1245,7 @@ class virtual_bash
 					require_lang($occle_lang,NULL,NULL,true);
 			}
 
+			$already_required=array_keys($GLOBALS['_REQUIRED_CODE']);
 			foreach ($occle_state_code_diff as $occle_code)
 			{
 				if ((file_exists(get_file_base().'/sources_custom/'.$occle_code.'.php')) || (file_exists(get_file_base().'/sources/'.$occle_code.'.php')))
@@ -1254,7 +1258,7 @@ class virtual_bash
 
 			$this->output[STREAM_STDERR]='';
 
-			@ini_set('ocproducts.xss_detect','0');
+			safe_ini_set('ocproducts.xss_detect','0');
 			ob_start();
 			if ((!defined('HIPHOP_PHP')) || (@eval('return 1;')===1))
 			{
@@ -1277,9 +1281,17 @@ class virtual_bash
 					$occle_state_diff[$occle_change]=$occle_env_after[$occle_change];
 			}
 
-			ocp_setcookie('occle_state',serialize($occle_state_diff));
-			ocp_setcookie('occle_state_code',serialize(array_keys($GLOBALS['_REQUIRED_CODE'])));
-			ocp_setcookie('occle_state_lang',serialize(array_keys($GLOBALS['LANGS_REQUESTED'])));
+			$cookie_size=strlen(serialize($_COOKIE));
+			if ($cookie_size<4096) // Be careful, large cookies can block Apache requests
+			{
+				ocp_setcookie('occle_state_b64',base64_encode(serialize($occle_state_diff)));
+				ocp_setcookie('occle_state_code_b64',base64_encode(serialize(array_diff(array_keys($GLOBALS['_REQUIRED_CODE']),$already_required))));
+				ocp_setcookie('occle_state_lang_b64',base64_encode(serialize(array_keys($GLOBALS['LANGS_REQUESTED']))));
+				// ^ We use base64 encoding to work around inane modsecurity restrictions. We can't always work around modsecurity (GET/POST encoding would be too messy), but for cookies it is an easy win
+			} else
+			{
+				ocp_eatcookie('occle_state_b64');
+			}
 		}
 		else
 		{
@@ -1333,6 +1345,11 @@ class virtual_bash
  */
 class virtual_fs
 {
+	var $virtual_fs;
+	var $pwd;
+	var $current_meta;
+	var $current_meta_pwd;
+
 	/**
 	 * Constructor function. Setup a virtual filesystem, but do nothing with it.
 	 */
@@ -1388,15 +1405,14 @@ class virtual_fs
 	function _start_pwd()
 	{
 		//Fetch the pwd from a cookie, or generate a new one
-		if (array_key_exists('occle_dir',$_COOKIE))
+		if (array_key_exists('occle_dir_b64',$_COOKIE))
 		{
-			if (get_magic_quotes_gpc()) $_COOKIE['occle_dir']=stripslashes($_COOKIE['occle_dir']);
-			return $this->_pwd_to_array($_COOKIE['occle_dir']);
+			return $this->_pwd_to_array(@strval(base64_decode($_COOKIE['occle_dir_b64'])));
 		}
 		else
 		{
 			$default_dir=array();
-			ocp_setcookie('occle_dir',$this->_pwd_to_string($default_dir));
+			ocp_setcookie('occle_dir_b64',base64_encode($this->_pwd_to_string($default_dir)));
 			return $default_dir;
 		}
 	}
@@ -1475,6 +1491,7 @@ class virtual_fs
 	function _pwd_to_array($pwd)
 	{
 		//Convert a string-form pwd to an array-form pwd, and sanitise it
+		if ($pwd=='') $pwd='/';
 		$absolute=($pwd[0]=='/');
 		$_pwd=explode('/',$pwd);
 		if ($absolute) $target_directory=array();
@@ -1736,7 +1753,7 @@ class virtual_fs
 		if ($this->_is_dir($target_directory))
 		{
 			$this->pwd=$target_directory;
-			ocp_setcookie('occle_dir',$this->_pwd_to_string($target_directory));
+			ocp_setcookie('occle_dir_b64',base64_encode($this->_pwd_to_string($target_directory)));
 
 			return true;
 		}

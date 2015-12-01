@@ -177,12 +177,12 @@ class Module_admin_config
 			add_config_option('COUNT_TOPICSCOUNT','forum_show_personal_stats_topics','tick','return ((has_no_forum()) || (get_forum_type()!=\'ocf\'))?NULL:\'0\';','BLOCKS','PERSONAL_BLOCK');
 			add_config_option('ADMIN_ZONE_LINK','ocp_show_personal_adminzone_link','tick','return \'1\';','BLOCKS','PERSONAL_BLOCK');
 			add_config_option('CONCEDED_MODE_LINK','ocp_show_conceded_mode_link','tick','return \'0\';','BLOCKS','PERSONAL_BLOCK');
-			add_config_option('SU','ocp_show_su','tick','return has_no_forum()?NULL:\'1\';','BLOCKS','PERSONAL_BLOCK');
+			add_config_option('SU','ocp_show_su','tick','return (get_forum_type()==\'none\')?NULL:\'1\';','BLOCKS','PERSONAL_BLOCK');
 			add_config_option('PAGE_ACTIONS','ocp_show_staff_page_actions','tick','return \'1\';','THEME','GENERAL');
-			add_config_option('MY_PROFILE_LINK','ocf_show_profile_link','tick','return has_no_forum()?NULL:\'1\';','BLOCKS','PERSONAL_BLOCK');
-			add_config_option('_USERGROUP','ocp_show_personal_usergroup','tick','return has_no_forum()?NULL:\'0\';','BLOCKS','PERSONAL_BLOCK');
+			add_config_option('MY_PROFILE_LINK','ocf_show_profile_link','tick','return (get_forum_type()==\'none\')?NULL:\'1\';','BLOCKS','PERSONAL_BLOCK');
+			add_config_option('_USERGROUP','ocp_show_personal_usergroup','tick','return (get_forum_type()==\'none\')?NULL:\'0\';','BLOCKS','PERSONAL_BLOCK');
 			add_config_option('LAST_HERE','ocp_show_personal_last_visit','tick','return has_no_forum()?NULL:\'0\';','BLOCKS','PERSONAL_BLOCK');
-			add_config_option('AVATAR','ocp_show_avatar','tick','return (has_no_forum() || ((get_forum_type()==\'ocf\') && (!addon_installed(\'ocf_member_avatars\'))))?NULL:\'0\';','BLOCKS','PERSONAL_BLOCK');
+			add_config_option('AVATAR','ocp_show_avatar','tick','return ((get_forum_type()==\'none\') || ((get_forum_type()==\'ocf\') && (!addon_installed(\'ocf_member_avatars\'))))?NULL:\'0\';','BLOCKS','PERSONAL_BLOCK');
 			add_config_option('ROOT_ZONE_LOGIN_THEME','root_zone_login_theme','tick','return \'0\';','THEME','GENERAL');
 			add_config_option('SHOW_DOCS','show_docs','tick','return \'1\';','SITE','ADVANCED');
 			add_config_option('CAPTCHA_NOISE','captcha_noise','tick','return addon_installed(\'captcha\')?\'1\':NULL;','SECURITY','SPAMMER_DETECTION');
@@ -488,6 +488,24 @@ class Module_admin_config
 	 */
 	function config_choose()
 	{
+		// Test to see if we have any ModSecurity issue that blocks config form submissions, via posting through some perfectly legitimate things that it might be paranoid about
+		if (count($_POST)==0)
+		{
+			$proper_url=build_url(array('page'=>''),'');
+			$_proper_url=$proper_url->evaluate();
+			$test_a=http_download_file($_proper_url,0,false,true,'ocPortal',array('test_a'=>'/usr/bin/unzip -o @_SRC_@ -x -d @_DST_@','test_b'=>'<iframe src="http://example.com/"></iframe>','test_c'=>'<script>console.log(document.cookie);</script>'));
+			$message_a=$GLOBALS['HTTP_MESSAGE'];
+			if ($message_a=='200')
+			{
+				$test_b=http_download_file($_proper_url,0,false,true);
+				$message_b=$GLOBALS['HTTP_MESSAGE'];
+				if (($message_b!='200') && ($message_a!=$message_b))
+				{
+					attach_message(do_lang_tempcode('MOD_SECURITY',escape_html($message_b)),'warn');
+				}
+			}
+		}
+
 		$GLOBALS['HELPER_PANEL_PIC']='pagepics/config';
 		$GLOBALS['HELPER_PANEL_TUTORIAL']='tut_adv_configuration';
 
@@ -837,7 +855,7 @@ class Module_admin_config
 			warn_exit(do_lang_tempcode('INTERNAL_ERROR'));
 
 		// Make sure we haven't locked ourselves out due to clean URL support
-		if ((post_param_integer('mod_rewrite',0)==1) && (get_option('mod_rewrite')=='0') && (substr(ocp_srv('SERVER_SOFTWARE'),0,6)=='Apache') && ((!file_exists(get_file_base().DIRECTORY_SEPARATOR.'.htaccess')) || (strpos(file_get_contents(get_file_base().DIRECTORY_SEPARATOR.'.htaccess'),'RewriteEngine on')===false) || (http_download_file(get_base_url().'/sitemap.htm',NULL,false,true)!='') && ($GLOBALS['HTTP_MESSAGE']=='404')))
+		if ((post_param_integer('mod_rewrite',0)==1) && (get_option('mod_rewrite')=='0') && (substr(ocp_srv('SERVER_SOFTWARE'),0,6)=='Apache') && ((!file_exists(get_file_base().DIRECTORY_SEPARATOR.'.htaccess')) || (strpos(file_get_contents(get_file_base().DIRECTORY_SEPARATOR.'.htaccess'),'RewriteEngine on')===false) || ((function_exists('apache_get_modules')) && (!in_array('mod_rewrite',apache_get_modules()))) || (http_download_file(get_base_url().'/sitemap.htm',NULL,false,true)!='') && ($GLOBALS['HTTP_MESSAGE']=='404')))
 		{
 			warn_exit(do_lang_tempcode('BEFORE_MOD_REWRITE'));
 		}
@@ -946,7 +964,7 @@ class Module_admin_config
 					set_value('timezone',$value);
 				}
 			}
-			elseif ($myrow['c_set']==1)
+			else
 			{
 				if ((($myrow['the_type']=='transline') || ($myrow['the_type']=='transtext')) && (is_numeric($myrow['config_value'])))
 				{
@@ -954,17 +972,10 @@ class Module_admin_config
 				} else $old_value=$myrow['config_value'];
 
 				// If the option was changed
-				if ($old_value!=$value)
+				if (($old_value!=$value) || ($myrow['c_set']==0))
 				{
 					set_option($myrow['the_name'],$value,$myrow['the_type'],$myrow['config_value']);
 				}
-			} else
-			{
-				if (($myrow['the_type']=='transline') || ($myrow['the_type']=='transtext'))
-				{
-					$_value=strval(insert_lang($value,1));
-				} else $_value=$value;
-				$GLOBALS['SITE_DB']->query_update('config',array('config_value'=>$_value,'c_set'=>1),array('the_name'=>$myrow['the_name']),'',1);
 			}
 		}
 

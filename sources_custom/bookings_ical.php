@@ -22,9 +22,9 @@ function bookables_ical_script()
 
 	require_lang('booking');
 
-	@ini_set('ocproducts.xss_detect','0');
+	safe_ini_set('ocproducts.xss_detect','0');
 
-	//header('Content-Type: text/calendar');
+	//header('Content-Type: text/calendar; charset='.get_charset());
 	//header('Content-Disposition: inline; filename="bookables_export.ics"');
 
 	if (function_exists('set_time_limit')) @set_time_limit(0);
@@ -155,11 +155,11 @@ function bookings_ical_script()
 	require_code('calendar_ical');
 	require_code('booking');
 
-	@ini_set('ocproducts.xss_detect','0');
+	safe_ini_set('ocproducts.xss_detect','0');
 
 	if ($pass_ok)
 	{
-		header('Content-Type: text/calendar');
+		header('Content-Type: text/calendar; charset='.get_charset());
 		header('Content-Disposition: inline; filename="bookings_export.ics"');
 	} // If not, it's an admin testing, so just display contents
 

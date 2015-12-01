@@ -81,8 +81,11 @@ function ocf_edit_group($group_id,$name,$is_default,$is_super_admin,$is_super_mo
 	if (!is_null($is_super_moderator)) $map['g_is_super_moderator']=$is_super_moderator;
 	$map['g_group_leader']=$group_leader;
 	if (!is_null($title)) $map['g_title']=lang_remap($_title,$title,$GLOBALS['FORUM_DB']);
-	$map['g_promotion_target']=$promotion_target;
-	$map['g_promotion_threshold']=$promotion_threshold;
+	if (addon_installed('points'))
+	{
+		$map['g_promotion_target']=$promotion_target;
+		$map['g_promotion_threshold']=$promotion_threshold;
+	}
 	if (!is_null($flood_control_submit_secs)) $map['g_flood_control_submit_secs']=$flood_control_submit_secs;
 	if (!is_null($flood_control_access_secs)) $map['g_flood_control_access_secs']=$flood_control_access_secs;
 	if (!is_null($max_daily_upload_mb)) $map['g_max_daily_upload_mb']=$max_daily_upload_mb;
@@ -91,8 +94,11 @@ function ocf_edit_group($group_id,$name,$is_default,$is_super_admin,$is_super_mo
 	if (!is_null($max_avatar_height)) $map['g_max_avatar_height']=$max_avatar_height;
 	if (!is_null($max_post_length_comcode)) $map['g_max_post_length_comcode']=$max_post_length_comcode;
 	if (!is_null($max_sig_length_comcode)) $map['g_max_sig_length_comcode']=$max_sig_length_comcode;
-	if (!is_null($gift_points_base)) $map['g_gift_points_base']=$gift_points_base;
-	if (!is_null($gift_points_per_day)) $map['g_gift_points_per_day']=$gift_points_per_day;
+	if (addon_installed('points'))
+	{
+		if (!is_null($gift_points_base)) $map['g_gift_points_base']=$gift_points_base;
+		if (!is_null($gift_points_per_day)) $map['g_gift_points_per_day']=$gift_points_per_day;
+	}
 	if (!is_null($enquire_on_new_ips)) $map['g_enquire_on_new_ips']=$enquire_on_new_ips;
 	if (!is_null($rank_image)) $map['g_rank_image']=$rank_image;
 	if (!is_null($hidden)) $map['g_hidden']=$hidden;
@@ -235,9 +241,13 @@ function ocf_member_leave_group($group_id,$member_id=NULL)
 	$group_leader=$GLOBALS['FORUM_DB']->query_value('f_groups','g_group_leader',array('id'=>$group_id));
 	if ($group_leader==$member_id) $GLOBALS['FORUM_DB']->query_update('f_groups',array('g_group_leader'=>NULL),array('id'=>$group_id),'',1);
 
-	$GLOBALS['FORUM_DB']->query_delete('f_group_members',array('gm_group_id'=>$group_id,'gm_member_id'=>$member_id),'',1);
+	$test=$GLOBALS['FORUM_DB']->query_value_null_ok('f_group_members','gm_group_id',array('gm_group_id'=>$group_id,'gm_member_id'=>$member_id));
+	if (!is_null($test))
+	{
+		$GLOBALS['FORUM_DB']->query_delete('f_group_members',array('gm_group_id'=>$group_id,'gm_member_id'=>$member_id),'',1);
 
-	log_it('MEMBER_REMOVED_FROM_GROUP',strval($member_id),strval($group_id));
+		log_it('MEMBER_REMOVED_FROM_GROUP',strval($member_id),strval($group_id));
+	}
 }
 
 /**

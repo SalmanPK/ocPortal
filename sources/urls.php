@@ -55,7 +55,7 @@ function init__urls()
  */
 function get_self_url_easy()
 {
-	$protocol=((ocp_srv('HTTPS')!='') && (ocp_srv('HTTPS')!='off'))?'https':'http';
+	$protocol=tacit_https()?'https':'http';
 	if (!isset($_SERVER['HTTP_HOST']))
 	{
 		$domain=get_domain();
@@ -234,7 +234,12 @@ function skippable_keep($key,$val)
  */
 function tacit_https()
 {
-	return ((ocp_srv('HTTPS')!='') && (ocp_srv('HTTPS')!='off'));
+	static $tacit_https=NULL;
+	if ($tacit_https===NULL)
+	{
+		$tacit_https=((ocp_srv('HTTPS')!='') && (ocp_srv('HTTPS')!='off')) || (ocp_srv('HTTP_X_FORWARDED_PROTO')=='https');
+	}
+	return $tacit_https;
 }
 
 /**
@@ -626,6 +631,7 @@ function _url_rewrite_params($zone_name,$vars,$force_index_php=false)
 				foreach ($extra_vars as $key=>$val) // Add these in explicitly
 				{
 					if ($val===NULL) continue;
+					if (is_integer($key)) $key=strval($key);
 					if ($val===SELF_REDIRECT) $val=get_self_url(true,true);
 					$_makeup.=($first?'?':'&').$key.'='.ocp_url_encode($val,true);
 					$first=false;
@@ -1019,9 +1025,10 @@ function set_execution_context($new_get,$new_zone='_SEARCH',$new_current_script=
 		$_GET[$key]=is_integer($val)?strval($val):$val;
 	}
 
-	global $RELATIVE_PATH,$ZONE;
+	global $RELATIVE_PATH,$ZONE,$SELF_URL_CACHED;
 	$RELATIVE_PATH=($new_zone=='_SEARCH')?get_page_zone(get_param('page')):$new_zone;
 	$ZONE=NULL; // So zone details will have to reload
+	$SELF_URL_CACHED=NULL;
 
 	global $PAGE_NAME_CACHE;
 	$PAGE_NAME_CACHE=NULL;

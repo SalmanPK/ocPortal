@@ -22,12 +22,12 @@ function script_load_stuff()
 	/* Dynamic images need preloading */
 	var preloader=new Image();
 	var images=[];
-	images[0]='{$IMG;,menus/menu_bullet_hover}'.replace(/^http:/,window.location.protocol);
-	images[1]='{$IMG;,menus/menu_bullet_expand_hover}'.replace(/^http:/,window.location.protocol);
-	images[2]='{$IMG;,expand}'.replace(/^http:/,window.location.protocol);
-	images[3]='{$IMG;,contract}'.replace(/^http:/,window.location.protocol);
-	images[4]='{$IMG;,exp_con}'.replace(/^http:/,window.location.protocol);
-	images[5]='{$IMG;,loading}'.replace(/^http:/,window.location.protocol);
+	images[0]='{$IMG;,menus/menu_bullet_hover}'.replace(/^https?:/,window.location.protocol);
+	images[1]='{$IMG;,menus/menu_bullet_expand_hover}'.replace(/^https?:/,window.location.protocol);
+	images[2]='{$IMG;,expand}'.replace(/^https?:/,window.location.protocol);
+	images[3]='{$IMG;,contract}'.replace(/^https?:/,window.location.protocol);
+	images[4]='{$IMG;,exp_con}'.replace(/^https?:/,window.location.protocol);
+	images[5]='{$IMG;,loading}'.replace(/^https?:/,window.location.protocol);
 	for (i=0;i<images.length;i++) preloader.src=images[i];
 
 	/* Textarea scroll support */
@@ -166,7 +166,7 @@ function set_font_size(size)
 {
 	var old_size=read_cookie('font_size');
 	var old_sizer=document.getElementById('font_size_'+old_size);
-	if (old_sizer) old_sizer.className=old_sizer.className.replace(' selected','');
+	if (old_sizer) old_sizer.className=old_sizer.className.replace(/ selected/g,'');
 
 	document.body.style.fontSize=size+'px';
 	set_cookie('font_size',size,120);
@@ -181,10 +181,80 @@ function new_html__initialise(element)
 	switch (element.nodeName.toLowerCase())
 	{
 		case 'img':
+			/* GD text maybe can do with transforms */
+			if (element.className=='gd_text')
+			{
+				var span=document.createElement('span');
+				if (typeof span.style.writingMode=='string') // IE (which has buggy rotation space reservation, but a decent writing-mode instead)
+				{
+					element.style.display='none';
+					span.style.writingMode='tb-lr';
+					if (span.style.writingMode!='tb-lr')
+						span.style.writingMode='vertical-lr';
+					span.style.webkitWritingMode='vertical-lr';
+					span.style.mozWritingMode='vertical-lr';
+					span.style.whiteSpace='nowrap';
+					if (typeof span.textContent!='undefined')
+					{
+						span.textContent=element.alt;
+					} else
+					{
+						set_inner_html(span,escape_html(element.alt));
+					}
+					element.parentNode.insertBefore(span,element);
+				} else
+				if (typeof span.style.msTransform=='string' || typeof span.style.webkitTransform=='string' || typeof span.style.MozTransform=='string' || typeof span.style.transform=='string')
+				{
+					element.style.display='none';
+					span.style.msTransform='rotate(90deg)';
+					span.style.webkitTransform='rotate(90deg)';
+					span.style.MozTransform='rotate(90deg)';
+					span.style.transform='rotate(90deg)';
+					span.style.msTransformOrigin='bottom left';
+					span.style.webkitTransformOrigin='bottom left';
+					span.style.MozTransformOrigin='bottom left';
+					span.style.transformOrigin='bottom left';
+					span.style.top='-1em';
+					span.style.left='0.5em';
+					span.style.position='relative';
+					span.style.display='inline-block';
+					span.style.whiteSpace='nowrap';
+					span.style.paddingRight='0.5em';
+					element.parentNode.style.textAlign='left';
+					element.parentNode.style.width='1em';
+					element.parentNode.style.overflow='hidden'; // Needed due to https://bugzilla.mozilla.org/show_bug.cgi?id=456497
+					element.parentNode.style.verticalAlign='top';
+					if (typeof span.textContent!='undefined')
+					{
+						span.textContent=element.alt;
+					} else
+					{
+						set_inner_html(span,escape_html(element.alt));
+					}
+					element.parentNode.insertBefore(span,element);
+					var span_proxy=span.cloneNode(true); // So we can measure width even with hidden tabs
+					span_proxy.style.position='absolute';
+					span_proxy.style.visibility='hidden';
+					document.body.appendChild(span_proxy);
+					window.setTimeout(function() {
+						var width=find_width(span_proxy)+15;
+						span_proxy.parentNode.removeChild(span_proxy);
+						if (element.parentNode.nodeName.toLowerCase()=='th' || element.parentNode.nodeName.toLowerCase()=='td')
+						{
+							element.parentNode.style.height=find_width(span)+'px';
+						} else
+						{
+							element.parentNode.style.minHeight=find_width(span)+'px';
+						}
+					},0);
+				}
+			}
+
 			/* Convert a/img title attributes into ocPortal tooltips */
 			{+START,IF,{$CONFIG_OPTION,js_overlays}}
 				convert_tooltip(element);
 			{+END}
+
 			break;
 
 		case 'a':
@@ -308,6 +378,14 @@ add_event_listener_abstract(window,'unload',function() { window.unloaded=true; }
 function staff_unload_action()
 {
 	undo_staff_unload_action();
+
+	if (document.activeElement && typeof document.activeElement.href!='undefined' && document.activeElement.href!=null)
+	{
+		var url=document.activeElement.href.replace(/.*:\/\/[^\/:]+/,'');
+		if (url.indexOf('download')!=-1 || url.indexOf('export')!=-1)
+			return;
+	}
+
 	var bi=document.getElementById('main_website_inner');
 	if (bi)
 	{
@@ -324,7 +402,7 @@ function staff_unload_action()
 	div.style.position='absolute';
 	div.style.zIndex=10000;
 	div.style.textAlign='center';
-	set_inner_html(div,'<span aria-busy="true" class="loading_box box"><h2>{!LOADING;^}</h2><img id="loading_image" alt="" src="'+'{$IMG;,loading}'.replace(/^http:/,window.location.protocol)+'" /></span>');
+	set_inner_html(div,'<span aria-busy="true" class="loading_box box"><h2>{!LOADING;^}</h2><img id="loading_image" alt="" src="'+'{$IMG;,loading}'.replace(/^https?:/,window.location.protocol)+'" /></span>');
 	window.setTimeout( function() { if (document.getElementById('loading_image')) document.getElementById('loading_image').src+=''; } , 100); // Stupid workaround for Google Chrome not loading an image on unload even if in cache
 	document.body.appendChild(div);
 	if (typeof window.scrollTo!='undefined')
@@ -355,7 +433,7 @@ function undo_staff_unload_action()
 			window.clearTimeout(window.fade_transition_timers[bi.fader_key]);
 			window.fade_transition_timers[bi.fader_key]=null;
 		}
-		bi.className=bi.className.replace(' site_unloading','');
+		bi.className=bi.className.replace(/ site_unloading/g,'');
 	}
 }
 
@@ -376,7 +454,7 @@ function check_field_for_blankness(field,event)
 
 	var ee=document.getElementById('error_'+field.id);
 
-	if ((value.replace(/\s/g,'')=='') || (value=='****') || (value=='{!POST_WARNING;^}'))
+	if ((value.replace(/\s/g,'')=='') || (value=='****') || (value=='{!POST_WARNING;^}') || (value=='{!THREADED_REPLY_NOTICE;^,{!POST_WARNING}}'))
 	{
 		if (event)
 		{
@@ -430,12 +508,11 @@ function disable_button_just_clicked(input)
 /* Making the height of a textarea match its contents */
 function manage_scroll_height(ob)
 {
-	var dif=0;
-	if ((browser_matches('chrome'))/* || (browser_matches('ie')) This is some gap but it is needed for the scrollbox rendering */) dif=-4;
-	var height=(ob.scrollHeight-sts(ob.style.paddingTop)-sts(ob.style.paddingBottom)-sts(ob.style.marginTop)-sts(ob.style.marginBottom)+dif)
-	if ((height>5) && (sts(ob.style.height)<height) && (find_height(ob)<height))
+	var height=ob.scrollHeight+3;
+	if ((height>5) && (sts(ob.style.height)<height-3) && (find_height(ob)<height-3))
 	{
 		ob.style.height=height+'px';
+		ob.style.overflowY='hidden';
 		trigger_resize();
 	}
 }
@@ -666,7 +743,7 @@ function help_panel(show)
 	var i;
 	if (show)
 	{
-		panel_right.className=panel_right.className.replace(' helper_panel_hidden','');
+		panel_right.className=panel_right.className.replace(/ helper_panel_hidden/g,'');
 
 		helper_panel_contents.setAttribute('aria-expanded','true');
 		helper_panel_contents.style.display='block';
@@ -677,7 +754,7 @@ function help_panel(show)
 		}
 		if (read_cookie('hide_help_panel')=='1') set_cookie('hide_help_panel','0',100);
 		helper_panel_toggle.onclick=function() { return help_panel(false); };
-		helper_panel_toggle.childNodes[0].setAttribute('src','{$IMG;,help_panel_hide}'.replace(/^http:/,window.location.protocol));
+		helper_panel_toggle.childNodes[0].setAttribute('src','{$IMG;,help_panel_hide}'.replace(/^https?:/,window.location.protocol));
 	} else
 	{
 		if (read_cookie('hide_help_panel')=='')
@@ -703,7 +780,7 @@ function _hide_help_panel(middles,panel_right,global_message,helper_panel_conten
 	helper_panel_contents.style.display='none';
 	set_cookie('hide_help_panel','1',100);
 	helper_panel_toggle.onclick=function() { return help_panel(true); };
-	helper_panel_toggle.childNodes[0].setAttribute('src','{$IMG;,help_panel_show}'.replace(/^http:/,window.location.protocol));
+	helper_panel_toggle.childNodes[0].setAttribute('src','{$IMG;,help_panel_show}'.replace(/^https?:/,window.location.protocol));
 }
 
 /* Find the size of a dimensions in pixels without the px (not general purpose, just to simplify code) */
@@ -1023,19 +1100,31 @@ function find_url_tab()
 	{
 		var tab=window.location.hash.replace(/^#/,'').replace(/^tab\_\_/,'');
 
-		if (tab.indexOf('__')!=-1)
-		{
-			if (document.getElementById('g_'+tab.substr(0,tab.indexOf('__'))))
-				select_tab('g',tab.substr(0,tab.indexOf('__')));
-		}
 		if (document.getElementById('g_'+tab))
+		{
 			select_tab('g',tab);
+		}
+		else if ((tab.indexOf('__')!=-1) && (document.getElementById('g_'+tab.substr(0,tab.indexOf('__')))))
+		{
+			var old=window.location.hash;
+			select_tab('g',tab.substr(0,tab.indexOf('__')));
+			window.location.hash=old;
+		}
 	}
 }
-function select_tab(id,tab)
+function select_tab(id,tab,automated)
 {
-	if (document.getElementById('tab__'+tab.toLowerCase()))
+	if (typeof automated=='undefined') automated=false;
+
+	var tab_marker=document.getElementById('tab__'+tab.toLowerCase());
+	if (tab_marker)
+	{
+		// For URL purposes, we will change URL to point to tab
+		// HOWEVER, we do not want to cause a scroll so we will be careful
+		tab_marker.id='';
 		window.location.hash='#tab__'+tab.toLowerCase();
+		tab_marker.id='tab__'+tab.toLowerCase();
+	}
 
 	var tabs=[];
 	var i,element;
@@ -1085,12 +1174,12 @@ function select_tab(id,tab)
 		if (element)
 		{
 			if (element.className.indexOf('tab_active')!=-1)
-				element.className=element.className.replace(' tab_active','');
+				element.className=element.className.replace(/ tab_active/g,'');
 			if (tabs[i]==tab)	element.className+=' tab_active';
 		}
 	}
 
-	if (typeof window['load_tab__'+tab]!='undefined') window['load_tab__'+tab](); // Usually an AJAX loader
+	if (typeof window['load_tab__'+tab]!='undefined') window['load_tab__'+tab](automated); // Usually an AJAX loader
 
 	return false;
 }
@@ -1134,7 +1223,7 @@ function toggleable_tray(element,no_animate,cookie_id_name)
 	{
 		pic=document.getElementById('e_'+element.id);
 	}
-	if ((pic) && (pic.src=='{$IMG;,exp_con}'.replace(/^http:/,window.location.protocol))) return; // Currently in action
+	if ((pic) && (pic.src=='{$IMG;,exp_con}'.replace(/^https?:/,window.location.protocol))) return; // Currently in action
 
 	element.setAttribute('aria-expanded',(type=='none')?'false':'true');
 
@@ -1148,7 +1237,7 @@ function toggleable_tray(element,no_animate,cookie_id_name)
 			element.style.position='absolute'; /* So things do not just around now it is visible */
 			if (pic)
 			{
-				pic.src='{$IMG;,exp_con}'.replace(/^http:/,window.location.protocol);
+				pic.src='{$IMG;,exp_con}'.replace(/^https?:/,window.location.protocol);
 			}
 			window.setTimeout(function() { begin_toggleable_tray_animation(element,20,70,-1,pic); } ,20);
 		} else
@@ -1161,7 +1250,7 @@ function toggleable_tray(element,no_animate,cookie_id_name)
 
 			if (pic)
 			{
-				pic.src=((pic.src.indexOf('themewizard.php')!=-1)?pic.src.replace('expand','contract'):'{$IMG;,contract}').replace(/^http:/,window.location.protocol);
+				pic.src=((pic.src.indexOf('themewizard.php')!=-1)?pic.src.replace('expand','contract'):'{$IMG;,contract}').replace(/^https?:/,window.location.protocol);
 			}
 		}
 	} else
@@ -1170,14 +1259,14 @@ function toggleable_tray(element,no_animate,cookie_id_name)
 		{
 			if (pic)
 			{
-				pic.src='{$IMG;,exp_con}'.replace(/^http:/,window.location.protocol);
+				pic.src='{$IMG;,exp_con}'.replace(/^https?:/,window.location.protocol);
 			}
 			window.setTimeout(function() { begin_toggleable_tray_animation(element,-20,70,0,pic); } ,20);
 		} else
 		{
 			if (pic)
 			{
-				pic.src=((pic.src.indexOf("themewizard.php")!=-1)?pic.src.replace('contract','expand'):'{$IMG;,expand}').replace(/^http:/,window.location.protocol);
+				pic.src=((pic.src.indexOf("themewizard.php")!=-1)?pic.src.replace('contract','expand'):'{$IMG;,expand}').replace(/^https?:/,window.location.protocol);
 				pic.setAttribute('alt',pic.getAttribute('alt').replace('{!CONTRACT;}','{!EXPAND;}'));
 				pic.title='{!EXPAND;}'; // Needs doing because convert_tooltip may not have run yet
 				pic.ocp_tooltip_title='{!EXPAND;}';
@@ -1250,7 +1339,7 @@ function toggleable_tray_animate(element,final_height,animate_dif,orig_overflow,
 		element.style.outline='0';
 		if (pic)
 		{
-			pic.src=((animate_dif<0)?'{$IMG;,expand}':'{$IMG;,contract}').replace(/^http:/,window.location.protocol);
+			pic.src=((animate_dif<0)?'{$IMG;,expand}':'{$IMG;,contract}').replace(/^https?:/,window.location.protocol);
 			pic.setAttribute('alt',pic.getAttribute('alt').replace((animate_dif<0)?'{!CONTRACT;}':'{!EXPAND;}',(animate_dif<0)?'{!EXPAND;}':'{!CONTRACT;}'));
 			pic.ocp_tooltip_title=(animate_dif<0)?'{!EXPAND;}':'{!CONTRACT;}';
 		}
@@ -1336,7 +1425,7 @@ function illustrate_frame_load(pf,frame)
 		var body=de.getElementsByTagName('body');
 		if (body.length==0)
 		{
-			set_inner_html(de,'<head>'+head+'<\/head><body aria-busy="true" class="website_body"><div class="spaced"><div class="ajax_tree_list_loading vertical_alignment"><img id="loading_image" src="'+'{$IMG*;,loading}'.replace(/^http:/,window.location.protocol)+'" alt="{!LOADING;^}" /> <span class="vertical_alignment">{!LOADING;^}<\/span><\/div><\/div><\/body>');
+			set_inner_html(de,'<head>'+head+'<\/head><body aria-busy="true" class="website_body"><div class="spaced"><div class="ajax_tree_list_loading vertical_alignment"><img id="loading_image" src="'+'{$IMG*;,loading}'.replace(/^https?:/,window.location.protocol)+'" alt="{!LOADING;^}" /> <span class="vertical_alignment">{!LOADING;^}<\/span><\/div><\/div><\/body>');
 		} else
 		{
 			body[0].className='website_body';
@@ -1350,7 +1439,7 @@ function illustrate_frame_load(pf,frame)
 
 			if (de.getElementsByTagName('style').length==0) /* The conditional is needed for Firefox - for some odd reason it is unable to parse any head tags twice */
 				set_inner_html(head_element,head);
-			set_inner_html(body[0],'<div aria-busy="true" class="spaced"><div class="ajax_tree_list_loading"><img id="loading_image" class="vertical_alignment" src="'+'{$IMG*;,loading}'.replace(/^http:/,window.location.protocol)+'" alt="{!LOADING;^}" /> <span class="vertical_alignment">{!LOADING;^}<\/span><\/div><\/div>');
+			set_inner_html(body[0],'<div aria-busy="true" class="spaced"><div class="ajax_tree_list_loading"><img id="loading_image" class="vertical_alignment" src="'+'{$IMG*;,loading}'.replace(/^https?:/,window.location.protocol)+'" alt="{!LOADING;^}" /> <span class="vertical_alignment">{!LOADING;^}<\/span><\/div><\/div>');
 		}
 		var the_frame=window.frames[frame];
 		window.setTimeout( // Stupid workaround for Google Chrome not loading an image on unload even if in cache
@@ -1739,7 +1828,7 @@ function convert_tooltip(element)
 			// And now define nice listeners for it all...
 			var win=get_main_ocp_window(true);
 
-			element.ocp_tooltip_title=title;
+			element.ocp_tooltip_title=escape_html(title);
 
 			win.add_event_listener_abstract(
 				element,
@@ -2017,6 +2106,8 @@ function resize_frame(name,minHeight)
 			}
 		}
 	}
+
+	frame_element.style.transform='scale(1)'; // Workaround Chrome painting bug
 }
 function trigger_resize(and_subframes)
 {
@@ -2297,9 +2388,9 @@ function get_inner_html(element,outerToo)
 			}
 			else if (src_dom_node.nodeType==3) {
 				// text node
-				out+= (src_dom_node.nodeValue?src_dom_node.nodeValue:"");
+				out+=escape_html(src_dom_node.nodeValue?src_dom_node.nodeValue:"");
 			}
-			else if (src_dom_node.nodeType == 4) {
+			else if (src_dom_node.nodeType==4) {
 				// text node
 				out+=(src_dom_node.nodeValue?"<![CDATA["+src_dom_node.nodeValue+"]]":"");
 			}
@@ -2608,7 +2699,8 @@ function set_inner_html(element,tHTML,append)
 
 			window.setTimeout(function() {
 				var elements=element.getElementsByTagName('*');
-				for (var i=already_offset;i<elements.length;i++)
+				var length=elements.length;
+				for (var i=already_offset;i<length;i++)
 				{
 					new_html__initialise(elements[i]);
 				}
@@ -2708,24 +2800,28 @@ function apply_rating_highlight_and_ajax_code(likes,initial_rating,content_type,
 			bit.onclick=function(i) {
 				return function()	{
 					var template='';
+					var bit=document.getElementById('rating_bar_'+i+'__'+content_type+'__'+type+'__'+id);
 					var replace_spot=bit;
 					while (replace_spot!==null)
 					{
 						replace_spot=replace_spot.parentNode;
-						if (replace_spot.className.match(/^RATING_BOX( |$)/))
+						if (replace_spot!==null && replace_spot.className)
 						{
-							template='RATING_BOX';
-							break;
-						}
-						if (replace_spot.className.match(/^RATING_INLINE_STATIC( |$)/))
-						{
-							template='RATING_INLINE_STATIC';
-							break;
-						}
-						if (replace_spot.className.match(/^RATING_INLINE_DYNAMIC( |$)/))
-						{
-							template='RATING_INLINE_DYNAMIC';
-							break;
+							if (replace_spot.className.match(/^RATING_BOX( |$)/))
+							{
+								template='RATING_BOX';
+								break;
+							}
+							if (replace_spot.className.match(/^RATING_INLINE_STATIC( |$)/))
+							{
+								template='RATING_INLINE_STATIC';
+								break;
+							}
+							if (replace_spot.className.match(/^RATING_INLINE_DYNAMIC( |$)/))
+							{
+								template='RATING_INLINE_DYNAMIC';
+								break;
+							}
 						}
 					}
 					var snippet_request='rating&type='+window.encodeURIComponent(type)+'&id='+window.encodeURIComponent(id)+'&content_type='+window.encodeURIComponent(content_type)+'&template='+window.encodeURIComponent(template)+'&content_url='+window.encodeURIComponent(content_url)+'&content_title='+window.encodeURIComponent(content_title);
@@ -2845,7 +2941,8 @@ function replace_comments_form_with_ajax(options,hash)
 	{
 		comments_form.old_onsubmit=comments_form.onsubmit;
 
-		comments_form.onsubmit=function(event) {
+		comments_form.onsubmit=function(event,is_preview) {
+			if ((typeof is_preview!='undefined') && (is_preview)) return true;
 
 			// Cancel the event from running
 			if (typeof event=='undefined') var event=window.event;
@@ -2969,6 +3066,9 @@ function topic_reply(is_threaded,ob,id,replying_to_username,replying_to_post,rep
 		post.value+='[quote="'+replying_to_username+'"]\n'+replying_to_post+'\n[snapback]'+id+'[/snapback][/quote]\n\n';
 		//post.default_substring_to_strip=post.value;
 	}
+
+	manage_scroll_height(post);
+	post.scrollTop=post.scrollHeight;
 
 	return false;
 }

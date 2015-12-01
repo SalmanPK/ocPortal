@@ -24,13 +24,24 @@
 function gd_text_script()
 {
 	if (!function_exists('imagefontwidth')) return;
+	if (!function_exists('imagepng')) return;
 
-	$text=get_param('text');
+	$text=get_param('text',false,true);
 	if (get_magic_quotes_gpc()) $text=stripslashes($text);
 
 	$font_size=array_key_exists('size',$_GET)?intval($_GET['size']):8;
 
-	$font=get_param('font',get_file_base().'/data/fonts/'.filter_naughty(get_param('font','FreeMonoBoldOblique')).'.ttf');
+	$default_font='Courier New Bold Italic'; // Support ideal font if it is there (we cannot distribute)
+	if (!is_file(get_file_base().'/data_custom/fonts/'.filter_naughty($default_font).'.ttf'))
+	{
+		$default_font='FreeMonoBoldOblique'; // Fallback to distributed
+	}
+	$_font=get_param('font',$default_font);
+	$font=get_file_base().'/data_custom/fonts/'.filter_naughty($_font).'.ttf';
+	if (!is_file($font))
+	{
+		$font=get_file_base().'/data/fonts/'.filter_naughty($_font).'.ttf';
+	}
 
 	if ((!function_exists('imagettftext')) || (!array_key_exists('FreeType Support',gd_info())) || (@imagettfbbox(26.0,0.0,get_file_base().'/data/fonts/Vera.ttf','test')===false) || (strlen($text)==0))
 	{
@@ -129,7 +140,7 @@ function simple_tracker_script()
 		'c_url'=>$url,
 	));
 
-	header('Location: '.$url);
+	header('Location: '.str_replace(chr(13),'',str_replace(chr(10),'',$url)));
 }
 
 /**
@@ -158,8 +169,8 @@ function cron_bridge_script($caller)
 
 	if (get_param_integer('querymode',0)==1)
 	{
-		header('Content-Type: text/plain');
-		@ini_set('ocproducts.xss_detect','0');
+		header('Content-Type: text/plain; charset='.get_charset());
+		safe_ini_set('ocproducts.xss_detect','0');
 		require_code('files2');
 		$php_path=find_php_path();
 		echo $php_path.' -C -q --no-header '.$caller;
@@ -197,7 +208,7 @@ function cron_bridge_script($caller)
 		$object->run();
 	}
 
-	if (!headers_sent()) header('Content-type: text/plain');
+	if (!headers_sent()) header('Content-type: text/plain; charset='.get_charset());
 }
 
 /**
@@ -222,7 +233,7 @@ function iframe_script()
 	$site_closed=get_option('site_closed');
 	if (($site_closed=='1') && (!has_specific_permission(get_member(),'access_closed_site')) && (!$GLOBALS['IS_ACTUALLY_ADMIN']))
 	{
-		header('Content-Type: text/plain');
+		header('Content-Type: text/plain; charset='.get_charset());
 		@exit(get_option('closed'));
 	}
 
@@ -252,7 +263,7 @@ function pagelink_redirect_script()
 	if ((strpos($x,chr(10))!==false) || (strpos($x,chr(13))!==false))
 		log_hack_attack_and_exit('HEADER_SPLIT_HACK');
 
-	header('Location: '.$x);
+	header('Location: '.str_replace(chr(13),'',str_replace(chr(10),'',$x)));
 }
 
 /**
@@ -391,7 +402,7 @@ function block_helper_script()
 		$hook_files=array();
 		foreach ($hook_keys as $hook)
 		{
-			$path=get_custom_file_base().'/sources/hooks/systems/addon_registry/'.filter_naughty_harsh($hook).'.php';
+			$path=get_file_base().'/sources_custom/hooks/systems/addon_registry/'.filter_naughty_harsh($hook).'.php';
 			if (!file_exists($path))
 			{
 				$path=get_file_base().'/sources/hooks/systems/addon_registry/'.filter_naughty_harsh($hook).'.php';
@@ -500,7 +511,7 @@ function block_helper_script()
 			{
 				$url.='&save_to_id='.urlencode(get_param('save_to_id'));
 			}
-			$link_caption=do_lang_tempcode('NICE_BLOCK_NAME',escape_html(cleanup_block_name($block)),$block);
+			$link_caption=do_lang_tempcode('NICE_BLOCK_NAME',escape_html(cleanup_block_name($block)),escape_html($block));
 			$usage=array_key_exists($block,$block_usage)?$block_usage[$block]:array();
 
 			$block_types[$this_block_type]->attach(do_template('BLOCK_HELPER_BLOCK_CHOICE',array('_GUID'=>'079e9b37fc142d292d4a64940243178a','USAGE'=>$usage,'DESCRIPTION'=>$descriptiont,'URL'=>$url,'LINK_CAPTION'=>$link_caption)));
@@ -783,6 +794,7 @@ function block_helper_script()
 				elseif (preg_match('#'.do_lang('BLOCK_IND_EITHER').' (.+)#i',$description,$matches)!=0) // list
 				{
 					$description=preg_replace('# \('.do_lang('BLOCK_IND_EITHER').'.*\)#U','',$description);
+					$description=preg_replace('# '.do_lang('BLOCK_IND_EITHER').'.*$#Ui','',$description);
 
 					$list=new ocp_tempcode();
 					$matches2=array();
@@ -1013,7 +1025,7 @@ function thumb_script()
 
 	if ((strpos($url_thumb,chr(10))!==false) || (strpos($url_thumb,chr(13))!==false))
 		log_hack_attack_and_exit('HEADER_SPLIT_HACK');
-	header('Location: '.$url_thumb);
+	header('Location: '.str_replace(chr(13),'',str_replace(chr(10),'',$url_thumb)));
 }
 
 /**
@@ -1021,7 +1033,7 @@ function thumb_script()
  */
 function question_ui_script()
 {
-	@ini_set('ocproducts.xss_detect','0');
+	safe_ini_set('ocproducts.xss_detect','0');
 	$GLOBALS['SCREEN_TEMPLATE_CALLED']='';
 
 	$title=get_param('window_title',false,true);

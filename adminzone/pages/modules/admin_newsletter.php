@@ -215,7 +215,7 @@ class Module_admin_newsletter extends standard_aed_module
 				}
 			}
 
-			@ini_set('auto_detect_line_endings','1');
+			safe_ini_set('auto_detect_line_endings','1');
 			$myfile=fopen($_FILES['file']['tmp_name'],'rt');
 			$del=',';
 			$csv_test_line=fgetcsv($myfile,4096,$del);
@@ -593,12 +593,12 @@ class Module_admin_newsletter extends standard_aed_module
 		{
 			$filename='subscribers_'.$id.'.csv';
 
-			header('Content-type: text/csv');
+			header('Content-type: text/csv; charset='.get_charset());
 			header('Content-Disposition: attachment; filename="'.str_replace(chr(13),'',str_replace(chr(10),'',addslashes($filename))).'"');
 
 			if (ocp_srv('REQUEST_METHOD')=='HEAD') exit();
 
-			@ini_set('ocproducts.xss_detect','0');
+			safe_ini_set('ocproducts.xss_detect','0');
 		}
 
 		// Show subscribers
@@ -721,7 +721,7 @@ class Module_admin_newsletter extends standard_aed_module
 				$rows=$GLOBALS['SITE_DB']->query_select('newsletter_subscribe',array('DISTINCT email','COUNT(*) as cnt'),NULL,'GROUP BY SUBSTRING_INDEX(email,\'@\',-1)'); // Far less PHP processing
 			} else
 			{
-				$rows=$GLOBALS['SITE_DB']->query_select('newsletter_subscribe',array('DISTINCT email'),NULL,500,$start);
+				$rows=$GLOBALS['SITE_DB']->query_select('newsletter_subscribe',array('DISTINCT email'),NULL,'',500,$start);
 			}
 			foreach ($rows as $row)
 			{
@@ -789,6 +789,9 @@ class Module_admin_newsletter extends standard_aed_module
 
 			$fields->attach(form_input_tick(do_lang_tempcode('EMBED_FULL_ARTICLES'),do_lang_tempcode('DESCRIPTION_EMBED_FULL_ARTICLES'),'in_full',post_param_integer('in_full',0)==1));
 
+			if (function_exists('set_time_limit')) @set_time_limit(180);
+			disable_php_memory_limit();
+
 			//$_fields=array();
 			$chosen_categories='';
 			foreach (array_keys($_hooks) as $hook)
@@ -805,7 +808,7 @@ class Module_admin_newsletter extends standard_aed_module
 					if (is_object($cats)) $cats=$cats->evaluate($lang);
 					$matches=array();
 					$num_matches=preg_match_all('#<option [^>]*value="([^"]*)"[^>]*>([^<]*)</option>#',$cats,$matches);
-					if ($num_matches<500) /*reasonable limit*/
+					if ($num_matches<1500) /*reasonable limit*/
 					{
 						for ($i=0;$i<$num_matches;$i++)
 						{
@@ -911,7 +914,7 @@ class Module_admin_newsletter extends standard_aed_module
 			return redirect_screen(do_lang('PERIODIC_REMOVED'),$url,do_lang('PERIODIC_REMOVED_TEXT'));
 		}
 
-		$in_full=(post_param_integer('in_full',0)==1);
+		$in_full=post_param_integer('in_full',0);
 		$chosen_categories=post_param('chosen_categories');
 		$message=$this->_generate_whats_new_comcode($chosen_categories,$in_full,$lang,$cutoff_time);
 
@@ -1018,6 +1021,9 @@ class Module_admin_newsletter extends standard_aed_module
 			$_automatic.=$tp;
 		}
 		$completed=do_template('NEWSLETTER_AUTOMATED_FCOMCODE',array('_GUID'=>'20f6adc244b04d9e5206682ec4e0cc0f','CONTENT'=>$_automatic));
+
+		$completed=do_template('NEWSLETTER_DEFAULT_FCOMCODE',array('_GUID'=>'53c02947915806e519fe14c318813f46','CONTENT'=>$completed,'LANG'=>$lang,'SUBJECT'=>''));
+
 		return $completed->evaluate($lang);
 	}
 
@@ -1393,7 +1399,7 @@ class Module_admin_newsletter extends standard_aed_module
 			if (((is_swf_upload(true)) && (array_key_exists('file',$_FILES))) || ((array_key_exists('file',$_FILES)) && (is_uploaded_file($_FILES['file']['tmp_name']))))
 			{
 				$__csv_data=array();
-				@ini_set('auto_detect_line_endings','1');
+				safe_ini_set('auto_detect_line_endings','1');
 				$myfile=fopen($_FILES['file']['tmp_name'],'rt');
 				$del=',';
 				$csv_test_line=fgetcsv($myfile,4096,$del);
@@ -1441,6 +1447,7 @@ class Module_admin_newsletter extends standard_aed_module
 			$in_html=($html_only==1);
 		}
 		$text_preview=($html_only==1)?'':comcode_to_clean_text(static_evaluate_tempcode(template_to_tempcode($message)));
+
 		require_code('mail');
 		$preview_subject=$subject;
 		if (post_param_integer('make_periodic',0)==1)
@@ -1713,7 +1720,7 @@ class Module_admin_newsletter extends standard_aed_module
 
 			$num_readers=$GLOBALS['SITE_DB']->query_value('newsletter n JOIN '.get_table_prefix().'newsletter_subscribe s ON n.id=s.newsletter_id','COUNT(*)',array('code_confirm'=>0));
 
-			$fields->attach(results_entry(array(get_translated_text($row['title']),integer_format($num_readers),protect_from_escaping(hyperlink($edit_link,do_lang_tempcode('EDIT'),false,true,'#'.strval($row['id']))))),true);
+			$fields->attach(results_entry(array(get_translated_text($row['title']),integer_format($num_readers),protect_from_escaping(hyperlink($edit_link,do_lang_tempcode('EDIT'),false,true,'#'.strval($row['id'])))),true));
 		}
 
 		return array(results_table(do_lang($this->menu_label),get_param_integer('start',0),'start',either_param_integer('max',20),'max',$max_rows,$header_row,$fields,$sortables,$sortable,$sort_order),false);
